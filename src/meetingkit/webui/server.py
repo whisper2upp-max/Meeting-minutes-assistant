@@ -43,6 +43,7 @@ class UiState:
         self.devices = {"microphones": [], "system_sources": []}
         self.cfg: Config = load_config()
         self.prev_output_id: Optional[int] = None  # 录音前默认输出设备（macOS 录后还原）
+        self.meeting_attendees: List[str] = []     # 本场会议的参会人（会议维度，非全局）
 
     # ---- 线程安全的小工具 ----
     def log(self, msg: str) -> None:
@@ -159,7 +160,8 @@ class Api:
 
     # ---------- 录音 ----------
 
-    def start_recording(self, title: str = "", system_source: str = "", microphone: str = "") -> dict:
+    def start_recording(self, title: str = "", system_source: str = "", microphone: str = "",
+                        attendees: str = "") -> dict:
         if _state.busy():
             return {"ok": False, "error": "当前有任务进行中"}
         if IS_MACOS:
@@ -170,6 +172,7 @@ class Api:
         cfg = _state.cfg
         cfg.system_source = "" if system_source.startswith("（") else system_source
         cfg.microphone = "" if microphone.startswith("（") else microphone
+        _state.set(meeting_attendees=[a.strip() for a in attendees.splitlines() if a.strip()])
         title = (title or "").strip()
         _state.set(phase="recording", stage="recording", detail="",
                    error=None, result=None, started_at=datetime.now())
@@ -237,13 +240,14 @@ class Api:
             _state.log(f"选择文件失败：{exc}")
         return ""
 
-    def process_file(self, path: str) -> dict:
+    def process_file(self, path: str, attendees: str = "") -> dict:
         if _state.busy():
             return {"ok": False, "error": "当前有任务进行中"}
         p = Path(path).expanduser()
         if not p.exists():
             return {"ok": False, "error": f"文件不存在：{p}"}
-        _state.set(phase="processing", stage="prepare", detail=str(p.name),
+        _state.set(meeting_attendees=[a.strip() for a in attendees.splitlines() if a.strip()],
+                   phase="processing", stage="prepare", detail=str(p.name),
                    error=None, result=None)
         _spawn(self._process_worker, None, p)
         return {"ok": True}
@@ -283,7 +287,7 @@ class Api:
                 audio_path = audio_path
             minutes = pipeline_mod.run_pipeline(
                 audio_path, cfg, session_dir=session, title=title,
-                started_at=_state.started_at,
+                started_at=_state.started_at, attendees=_state.meeting_attendees,
                 progress=lambda s, d: _state.log(f"{s}｜{d}" if d else s))
             _state.set(phase="done",
                        result={"minutes": str(minutes),
@@ -336,6 +340,72 @@ class Api:
             _state.log(f"打开文件失败：{exc}")
         return {"ok": True}
 
+    # ---------- 纪要：查看 / 编辑 / 导出 / 历史会话 ----------
+
+    def _safe_minutes_path(self, path: str) -> Path:
+        p = Path(path).expanduser().resolve()
+        root = _state.cfg.resolved_output_dir().resolve()
+        if root not in p.parents:
+            raise RuntimeError("只能访问输出目录内的纪要文件")
+        return p
+
+    def get_minutes(self, path: str) -> dict:
+        try:
+            p = self._safe_minutes_path(path)
+            return {"ok": True, "content": p.read_text(encoding="utf-8"),
+                    "session": str(p.parent)}
+        except Exception as exc:
+            return {"ok": False, "error": f"{exc}"}
+
+    def save_minutes(self, path: str, content: str) -> dict:
+        try:
+            p = self._safe_minutes_path(path)
+            p.write_text(content, encoding="utf-8")
+            _state.log(f"纪要已保存：{p.name}")
+            return {"ok": True}
+        except Exception as exc:
+            return {"ok": False, "error": f"{exc}"}
+
+    def export_minutes(self, path: str) -> dict:
+        """导出纪要到用户选择的目录（同名冲突时自动加时间后缀）。"""
+        try:
+            src = self._safe_minutes_path(path)
+            dest_dir = self.pick_folder()
+            if not dest_dir:
+                return {"ok": False, "error": "未选择导出目录"}
+            dest_dir = Path(dest_dir).expanduser()
+            dest = dest_dir / src.name
+            if dest.exists():
+                stamp = datetime.now().strftime("%H%M%S")
+                dest = dest_dir / f"{src.stem}_{stamp}{src.suffix}"
+            import shutil
+            shutil.copy2(src, dest)
+            _state.log(f"纪要已导出：{dest}")
+            return {"ok": True, "dest": str(dest)}
+        except Exception as exc:
+            return {"ok": False, "error": f"{exc}"}
+
+    def list_sessions(self) -> dict:
+        """输出目录里最近有纪要的会议，供首页展示。"""
+        out = []
+        try:
+            root = _state.cfg.resolved_output_dir()
+            for d in root.iterdir():
+                if not d.is_dir():
+                    continue
+                m = d / pipeline_mod.MINUTES_MD
+                if not m.exists():
+                    continue
+                st = m.stat()
+                out.append({"name": d.name,
+                            "minutes": str(m),
+                            "mtime": datetime.fromtimestamp(st.st_mtime).strftime("%m-%d %H:%M"),
+                            "size_kb": st.st_size // 1024})
+            out.sort(key=lambda x: x["name"], reverse=True)
+        except Exception:
+            pass
+        return {"ok": True, "sessions": out[:8]}
+
 
 def _reveal(d: Path, select: Optional[Path] = None) -> None:
     try:
@@ -364,7 +434,7 @@ def _run_autotest(api: "Api", seconds: int, audio: str) -> None:
                 result["diag"]["default_out_before"] = mac_setup.get_default_output()["name"]
             except Exception as exc:
                 result["diag"]["default_out_before"] = f"err:{exc}"
-        r = api.start_recording("自动验收", "", "")
+        r = api.start_recording("自动验收", "", "", "")
         if not r.get("ok"):
             raise RuntimeError(r.get("error", "启动失败"))
         if audio:

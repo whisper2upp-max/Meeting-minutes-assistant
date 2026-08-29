@@ -72,8 +72,12 @@ def run_pipeline(
     progress: Optional[Progress] = None,
     transcribe_fn=transcribe_mod.transcribe_file,
     minutes_fn=llm_mod.generate_minutes,
+    attendees: Optional[list] = None,
 ) -> Path:
-    """完整处理一个音频文件，返回纪要文件路径。已完成的步骤自动跳过。"""
+    """完整处理一个音频文件，返回纪要文件路径。已完成的步骤自动跳过。
+
+    attendees 为 None 时回退到全局配置里的名单；非 None 时（含空列表）以传入值为准。
+    """
     api_key = cfg.effective_api_key()
     if not api_key:
         raise RuntimeError("未配置百炼 API Key：请先在“设置”中填写（或设置环境变量 DASHSCOPE_API_KEY）。")
@@ -112,7 +116,7 @@ def run_pipeline(
             transcript_md,
             api_key=api_key,
             model=cfg.llm_model,
-            attendees=cfg.attendees,
+            attendees=attendees if attendees is not None else cfg.attendees,
             meeting_title=title,
             started_at=started_at,
             base_url=cfg.llm_base_url(),
