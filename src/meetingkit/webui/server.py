@@ -8,8 +8,6 @@ from __future__ import annotations
 import subprocess
 import sys
 import threading
-import time
-import traceback
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -253,7 +251,7 @@ class Api:
                                "session": str(session)})
             _state.log(f"完成：{minutes}")
         except Exception as exc:
-            detail = "".join(traceback.format_exception_only(type(exc), exc)).strip()
+            detail = str(exc) or repr(exc)
             _state.set(phase="error", error=detail)
             _state.log(f"错误：{detail}")
 

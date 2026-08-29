@@ -42,6 +42,25 @@ def _sdk(base_url: str = ""):
     return _sdk_cache
 
 
+# 常见云端转写错误码 -> 可操作的中文提示
+_ASR_ERROR_HINTS = {
+    "ASR_RESPONSE_HAVE_NO_WORDS": (
+        "音频中没有识别到语音内容。常见原因：录音太短、全程无人说话、"
+        "或内录未生效（日志里“录音结束”应为 2 轨）。请确认设备后重试。"),
+    "FILE_DOWNLOAD_FAILED": "云端下载音频文件失败，请重试（临时存储链接 48 小时有效）。",
+    "AUDIO_TRANSCODE_FAILED": "音频解码失败，请换 WAV/MP3 等常见格式重试。",
+    "FILE_TOO_LARGE": "音频文件过大，请拆分后重试。",
+}
+
+
+def _friendly_task_error(output) -> str:
+    raw = json.dumps(output or {}, ensure_ascii=False)
+    for code, hint in _ASR_ERROR_HINTS.items():
+        if code in raw:
+            return hint + f"（错误码 {code}）"
+    return f"云端转写失败：{raw[:300]}"
+
+
 class TranscribeError(RuntimeError):
     pass
 
@@ -124,10 +143,7 @@ def transcribe_file(
         if status == "SUCCEEDED":
             break
         if status == "FAILED":
-            raise TranscribeError(
-                "云端转写失败："
-                f"{_extract(task, 'output', 'message') or json.dumps(_extract(task, 'output') or {}, ensure_ascii=False)}"
-            )
+            raise TranscribeError(_friendly_task_error(_extract(task, "output")))
         if time.monotonic() - started > _POLL_TIMEOUT_SEC:
             raise TranscribeError("转写超时（超过 60 分钟未完成）。")
         time.sleep(_POLL_INTERVAL_SEC)
