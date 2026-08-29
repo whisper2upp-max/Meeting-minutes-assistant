@@ -3,6 +3,7 @@ import wave
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from meetingkit.audio.base import (
     TARGET_SAMPLE_RATE, WavTrackWriter, mix_tracks_to_mono, read_wav_mono,
@@ -84,3 +85,25 @@ def test_mix_tracks_normalizes_and_averages():
         # 两轨各自归一后平均，能量应明显高于直接混合“小声轨”的水平
         rms = float(np.sqrt(np.mean(np.square(x))))
         assert rms > 0.02
+
+
+def test_mix_tracks_pads_small_length_difference_without_truncating(tmp_path):
+    short = tmp_path / "short.wav"
+    long = tmp_path / "long.wav"
+    out = tmp_path / "mixed.wav"
+    write_wav_mono(short, _sin(1.0, 48000, freq=440.0), 48000)
+    write_wav_mono(long, _sin(1.01, 48000, freq=660.0), 48000)
+
+    duration = mix_tracks_to_mono(
+        [type("S", (), {"path": short, "sample_rate": 48000, "label": "system"})(),
+         type("S", (), {"path": long, "sample_rate": 48000, "label": "mic"})()],
+        out,
+    )
+
+    mixed, sample_rate = read_wav_mono(out)
+    assert sample_rate == TARGET_SAMPLE_RATE
+    assert duration == pytest.approx(1.01, abs=1 / TARGET_SAMPLE_RATE)
+    assert len(mixed) == round(1.01 * TARGET_SAMPLE_RATE)
+    # 较长轨超出 1 秒的尾部仍保留，而不是为了对齐短轨被截断。
+    tail = mixed[TARGET_SAMPLE_RATE:]
+    assert float(np.sqrt(np.mean(np.square(tail)))) > 0.01

@@ -192,7 +192,7 @@ class Api:
             session = pipeline_mod.new_session_dir(cfg.resolved_output_dir(), title)
             _state.set(session_dir=session)
             _state.log(f"会话目录：{session}")
-            if IS_MACOS:
+            if IS_MACOS and not os.environ.get("MEETINGKIT_AUTOTEST_RAW"):
                 from ..audio import mac_setup
                 prev_output = mac_setup.prepare_for_recording(log=_state.log)
                 _state.set(prev_output_id=prev_output)
@@ -275,8 +275,7 @@ class Api:
                 _state.log(f"已混为单声道 16kHz：{dur / 60:.1f} 分钟")
                 # 全程静音守卫：避免把无声文件送去云端白跑一趟
                 import numpy as _np
-                from .audio.base import read_wav_mono as _read
-                _x, _ = _read(audio_path)
+                _x, _ = audio_mod.read_wav_mono(audio_path)
                 if float(_np.sqrt(_np.mean(_np.square(_x)))) < 1e-4:
                     raise RuntimeError(
                         "录音全程静音：最常见原因是麦克风权限未授予。"
@@ -354,27 +353,52 @@ def _run_autotest(api: "Api", seconds: int, audio: str) -> None:
     """隐藏自动验收（MEETINGKIT_AUTOTEST=秒数）：自动录音→播放测试音频→停止→跑完管线→退出。"""
     import json as _json
     import time as _t
-    result = {"phase": "error", "error": None, "session": None, "minutes": None}
+    result = {"phase": "error", "error": None, "session": None, "minutes": None,
+              "diag": {}}
+    player = None
     try:
         _t.sleep(2.5)  # 等窗口起来
+        if IS_MACOS:
+            try:
+                from ..audio import mac_setup
+                result["diag"]["default_out_before"] = mac_setup.get_default_output()["name"]
+            except Exception as exc:
+                result["diag"]["default_out_before"] = f"err:{exc}"
         r = api.start_recording("自动验收", "", "")
         if not r.get("ok"):
             raise RuntimeError(r.get("error", "启动失败"))
-        _t.sleep(2)
-        player = None
+        if audio:
+            # 等待录音 worker 完成输出设备切换（默认输出变为聚合设备）后再播放，
+            # 否则 afplay 可能撞上切换窗口、把声音播到旧设备或直接卡死
+            if IS_MACOS:
+                from ..audio import mac_setup
+                for _ in range(20):
+                    try:
+                        if mac_setup.get_default_output()["uid"] == mac_setup.AGG_UID:
+                            break
+                    except Exception:
+                        pass
+                    _t.sleep(1)
+        _t.sleep(1)
         if audio:
             import subprocess as _sp
             player = _sp.Popen(["afplay", audio])
         _t.sleep(seconds)
         api.stop_recording()
+        if player is not None:
+            try:
+                player.wait(timeout=5)
+            except Exception:
+                player.terminate()
+            result["diag"]["afplay_rc"] = player.returncode
         for _ in range(240):  # 等管线完成（含云端转写），最多 4 分钟
             _t.sleep(1)
             st = api.get_status()
             if st["phase"] in ("done", "error"):
                 break
-        result = {"phase": st["phase"], "error": st.get("error"),
-                  "session": st.get("session_dir"),
-                  "minutes": (st.get("result") or {}).get("minutes")}
+        result.update({"phase": st["phase"], "error": st.get("error"),
+                       "session": st.get("session_dir"),
+                       "minutes": (st.get("result") or {}).get("minutes")})
     except Exception as exc:
         result["error"] = f"{exc}"
     finally:
@@ -413,6 +437,26 @@ def main() -> None:
             background_color="#f4f5f7",
         )
         autotest = os.environ.get("MEETINGKIT_AUTOTEST")
+        if not autotest and Path("/tmp/mk_autotest").exists():
+            # 经 `open` 启动时环境变量传不进来，用标记文件（内容：秒数<TAB>音频路径）。
+            # 用 `open` 启动时音频权限才归属 app 自身；从终端直启会归属终端宿主而被置零。
+            try:
+                parts = Path("/tmp/mk_autotest").read_text(encoding="utf-8").split("\t")
+                autotest = parts[0].strip()
+                if len(parts) > 1:
+                    os.environ["MEETINGKIT_AUTOTEST_AUDIO"] = parts[1].strip()
+                for extra in parts[2:]:
+                    extra = extra.strip()
+                    if extra == "raw":
+                        os.environ["MEETINGKIT_AUTOTEST_RAW"] = "1"  # 诊断：跳过聚合设备切换
+                    elif extra.startswith("exp"):
+                        os.environ["MEETINGKIT_AGG_EXP"] = extra[3:]  # 聚合配方实验
+            except Exception:
+                autotest = None
+            try:
+                Path("/tmp/mk_autotest").unlink()
+            except OSError:
+                pass
         if autotest:
             _spawn(_run_autotest, api, int(autotest),
                    os.environ.get("MEETINGKIT_AUTOTEST_AUDIO", ""))

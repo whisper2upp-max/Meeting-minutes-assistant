@@ -63,17 +63,32 @@ class MacRecorder:
         return _cb
 
     def _open(self, device: Optional[int], label: str, out_dir: Path) -> Optional[WavTrackWriter]:
-        dev = sd.query_devices(device)
+        # sounddevice.query_devices(None) 返回全部设备列表，而不是默认设备。
+        # 麦克风配置留空时 device 正是 None，因此必须显式指定 input，
+        # 才会解析为系统默认输入设备并取得它的采样率。
+        dev = sd.query_devices(device, "input")
         rate = int(dev["default_samplerate"])
         writer = WavTrackWriter(out_dir / f"track_{label}.wav", rate)
-        stream = sd.InputStream(
-            device=device,
-            channels=1,
-            samplerate=rate,
-            dtype="int16",
-            callback=self._make_callback(writer),
-        )
-        stream.start()
+        stream = None
+        try:
+            stream = sd.InputStream(
+                device=device,
+                channels=1,
+                samplerate=rate,
+                dtype="int16",
+                callback=self._make_callback(writer),
+            )
+            stream.start()
+        except Exception:
+            # 授权等待期间可能连续失败；每次失败都要释放 WAV/PortAudio
+            # 资源，否则重试会遗留空轨文件和未关闭的文件句柄。
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
+            writer.close()
+            raise
         self._streams.append(stream)
         self._writers.append(writer)
         self._specs.append(TrackSpec(writer.path, rate, label))

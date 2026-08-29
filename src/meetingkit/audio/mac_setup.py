@@ -209,6 +209,7 @@ def prepare_for_recording(log=print) -> int | None:
     """录音前调用：确保"当前输出 + BlackHole"多输出设备为默认输出。
 
     返回录音前默认输出设备的 id（供 restore_output 还原），无需还原时返回 None。
+    MEETINGKIT_AGG_EXP 环境变量用于实验不同创建配方（A=master+stacked数字, B=无master）。
     """
     devs = list_devices()
     bh = next((d for d in devs if "blackhole" in d["uid"].lower()), None)
@@ -227,15 +228,17 @@ def prepare_for_recording(log=print) -> int | None:
             _LIB.AudioHardwareDestroyAggregateDevice(d["id"])
 
     from Foundation import (NSArray, CFDictionaryCreate, CFStringCreateWithCString,
-                            kCFBooleanFalse, kCFStringEncodingUTF8)
+                            kCFBooleanTrue, kCFStringEncodingUTF8)
 
     def _s(x: str):
         return CFStringCreateWithCString(None, x.encode("utf-8"), kCFStringEncodingUTF8)
 
     import objc
-    keys = [_s(k) for k in ("uid", "name", "main", "private", "stacked", "subdevices")]
-    vals = [_s(AGG_UID), _s(AGG_NAME), _s(default["uid"]),
-            kCFBooleanFalse, kCFBooleanFalse,
+    # 多输出设备（声音复制到每个子设备）的正确配方：stacked=true，且不要带
+    # private 键——真机实验证明加 private=false 会造出无法播放/无法录制的坏设备
+    # （扬声器和 BlackHole 都收不到声音），去掉后立即恢复正常（会话 2239 实证）。
+    keys = [_s("uid"), _s("name"), _s("main"), _s("stacked"), _s("subdevices")]
+    vals = [_s(AGG_UID), _s(AGG_NAME), _s(default["uid"]), kCFBooleanTrue,
             NSArray.arrayWithArray_([
                 CFDictionaryCreate(None, [_s("uid")], [_s(default["uid"])], 1, None, None),
                 CFDictionaryCreate(None, [_s("uid")], [_s(bh["uid"])], 1, None, None),
@@ -248,6 +251,8 @@ def prepare_for_recording(log=print) -> int | None:
         raise RuntimeError("创建多输出设备失败")
     prev_id = default["id"]
     set_default_output(out_id.value)
+    import time as _t
+    _t.sleep(1.5)  # 等系统完成输出路由切换，避免播放器恰好撞上切换窗口
     log(f"已切换到“{AGG_NAME}”（{default['name']} + BlackHole），"
         f"录音期间系统音量条可能暂时失效")
     return prev_id

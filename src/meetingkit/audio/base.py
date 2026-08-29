@@ -121,13 +121,19 @@ def mix_tracks_to_mono(tracks: List[TrackSpec], out_path: Path,
     返回混合后时长（秒）。"""
     if not tracks:
         raise ValueError("没有任何录音轨道")
-    mixed: Optional[np.ndarray] = None
+    normalized: List[np.ndarray] = []
     for t in tracks:
         x, sr = read_wav_mono(t.path)
         x = resample(x, sr, target_rate)
-        x = rms_normalize(x)
-        mixed = x if mixed is None else mixed + x
-    assert mixed is not None
-    mixed = mixed / len(tracks)
+        normalized.append(rms_normalize(x))
+
+    # 独立音频设备的回调不会保证收到完全相同的帧数；即使同时启停，
+    # 两轨也常有几毫秒差异。按最长轨建缓冲区，较短轨尾部自然补零，
+    # 既避免 NumPy 广播错误，也不截掉任一轨末尾的有效语音。
+    max_len = max(len(x) for x in normalized)
+    mixed = np.zeros(max_len, dtype=np.float32)
+    for x in normalized:
+        mixed[:len(x)] += x
+    mixed /= len(normalized)
     write_wav_mono(out_path, mixed, target_rate)
     return len(mixed) / target_rate
