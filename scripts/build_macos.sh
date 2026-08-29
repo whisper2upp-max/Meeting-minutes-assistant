@@ -12,6 +12,7 @@ fi
   --name "会议纪要助手" \
   --paths src \
   --add-data "src/meetingkit/webui/index.html:meetingkit/webui/" \
+  --add-data "assets/BlackHole2ch.driver:meetingkit/assets/BlackHole2ch.driver" \
   --hidden-import meetingkit.audio.macos_rec \
   --hidden-import webview.platforms.cocoa \
   --icon assets/app.icns \

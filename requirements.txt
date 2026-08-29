@@ -7,8 +7,6 @@ sounddevice>=0.4.6
 tomli-w>=1.0
 tomli>=2.0; python_version < '3.11'
 pywebview>=5.0
-# macOS 独有：一键配置多输出设备脚本（scripts/setup_loopback_mac.py）所需
-pyobjc-framework-CoreAudio>=10.0; sys_platform == 'darwin'
 # Windows 独有：WASAPI 内录
 pyaudiowpatch>=0.2.12; sys_platform == 'win32'
 

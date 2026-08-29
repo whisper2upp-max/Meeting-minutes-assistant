@@ -1,6 +1,8 @@
 # 会议纪要助手
 
-Teams 会议（也适用于任何会议软件）**内录 + 麦克风录音 → 百炼 fun-asr 转写（自动区分说话人）→ qwen-flash 生成结构化会议纪要**。Windows / macOS 双平台，可打包分发给同事。网络请求只指向 `dashscope.aliyuncs.com`。
+Teams 会议（也适用于任何会议软件）**内录 + 麦克风录音 → 百炼 fun-asr 转写（自动区分说话人）→ qwen-flash 生成结构化会议纪要**。Windows / macOS 双平台，可打包分发给同事。网络请求只指向 `dashscope.aliyuncs.com`（或公司专属网关）。
+
+**零手工配置**：macOS 录音驱动（BlackHole）已内置，首次点录音自动安装（一次管理员密码）；录音时自动创建"多输出设备"边听边录、结束自动还原；换耳机自动适配。Windows 使用系统自带 WASAPI 内录，天然零配置。
 
 ## 快速开始（开发机）
 

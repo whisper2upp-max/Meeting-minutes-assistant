@@ -41,6 +41,7 @@ class UiState:
         self.started_at: Optional[datetime] = None
         self.devices = {"microphones": [], "system_sources": []}
         self.cfg: Config = load_config()
+        self.prev_output_id: Optional[int] = None  # 录音前默认输出设备（macOS 录后还原）
 
     # ---- 线程安全的小工具 ----
     def log(self, msg: str) -> None:
@@ -77,6 +78,10 @@ class UiState:
         host_label = cfg.resolved_api_host()
         host_label = ("官方端点" if host_label.endswith("dashscope.aliyuncs.com")
                       else host_label.replace("https://", ""))
+        loopback_ready = True
+        if IS_MACOS:
+            from ..audio import mac_setup
+            loopback_ready = mac_setup.blackhole_installed()
         return {
             "phase": phase, "stage": stage, "detail": detail,
             "error": error, "result": result,
@@ -84,6 +89,7 @@ class UiState:
             "logs": logs, "devices": devices,
             "session_dir": str(session) if session else "",
             "is_windows": IS_WINDOWS,
+            "loopback_ready": loopback_ready,
             "config": {
                 "has_key": bool(cfg.effective_api_key()),
                 "host_label": host_label,
@@ -155,6 +161,11 @@ class Api:
     def start_recording(self, title: str = "", system_source: str = "", microphone: str = "") -> dict:
         if _state.busy():
             return {"ok": False, "error": "当前有任务进行中"}
+        if IS_MACOS:
+            from ..audio import mac_setup
+            if not mac_setup.blackhole_installed():
+                return {"ok": False, "need_setup": True,
+                        "error": "首次使用需要安装录音驱动（开源 BlackHole，仅此一次）"}
         cfg = _state.cfg
         cfg.system_source = "" if system_source.startswith("（") else system_source
         cfg.microphone = "" if microphone.startswith("（") else microphone
@@ -164,12 +175,26 @@ class Api:
         _spawn(self._record_worker, title)
         return {"ok": True}
 
+    def setup_loopback(self) -> dict:
+        """首次使用：安装内置 BlackHole 驱动（弹管理员密码框）。"""
+        if not IS_MACOS:
+            return {"ok": True, "error": None}
+        from ..audio import mac_setup
+        ok, msg = mac_setup.install_blackhole()
+        _state.log(f"驱动安装：{msg}")
+        return {"ok": ok, "error": None if ok else msg}
+
     def _record_worker(self, title: str) -> None:
+        prev_output = None
         try:
             cfg = _state.cfg
             session = pipeline_mod.new_session_dir(cfg.resolved_output_dir(), title)
             _state.set(session_dir=session)
             _state.log(f"会话目录：{session}")
+            if IS_MACOS:
+                from ..audio import mac_setup
+                prev_output = mac_setup.prepare_for_recording(log=_state.log)
+                _state.set(prev_output_id=prev_output)
             rec = audio_mod.get_recorder(cfg.system_source, cfg.microphone)
             try:
                 rec.start(session)
@@ -179,6 +204,9 @@ class Api:
                 _state.log(f"⚠️ {msg}")
             _state.set(recorder=rec)
         except Exception as exc:
+            if prev_output is not None:
+                from ..audio import mac_setup
+                mac_setup.restore_output(prev_output, log=_state.log)
             _state.set(phase="error", error=f"{exc}", stage="", detail="")
             _state.log(f"错误：{exc}")
 
@@ -235,6 +263,10 @@ class Api:
             else:
                 session = _state.session_dir
                 specs = rec.stop()
+                if IS_MACOS:
+                    from ..audio import mac_setup
+                    mac_setup.restore_output(_state.prev_output_id, log=_state.log)
+                    _state.set(prev_output_id=None)
                 total = sum(s.path.stat().st_size for s in specs) / 1e6
                 _state.log(f"录音结束：{len(specs)} 轨，共 {total:.1f} MB")
                 audio_path = session / pipeline_mod.AUDIO_WAV

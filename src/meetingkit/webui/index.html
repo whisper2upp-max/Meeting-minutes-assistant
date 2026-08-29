@@ -346,6 +346,23 @@ main{flex:1;width:100%;max-width:1080px;margin:0 auto;padding:26px 24px 12px;dis
   </div>
 </div>
 
+<!-- 首次配置（安装录音驱动） -->
+<div class="overlay hidden" id="setupOverlay">
+  <div class="card modal" style="width:480px">
+    <div class="modal-title">首次使用配置</div>
+    <div class="modal-sub">只需这一次，之后打开即用</div>
+    <div style="font-size:13.5px;color:var(--ink2);line-height:1.7">
+      需要安装开源录音驱动 <b>BlackHole</b>（248 KB，GNU GPL 授权，随程序内置、不上传任何数据），
+      用于把会议声音录进程序。<br><br>
+      点击下方按钮后会弹出系统密码框，输入开机密码即可完成安装。
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="btnSetupCancel">取消</button>
+      <button class="btn primary" id="btnSetupInstall">一键安装并开始录音</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast hidden" id="toast"></div>
 
 <script>
@@ -456,11 +473,11 @@ function render(st){
 
   // mac 提示
   if(!st.is_windows){
-    const none = (st.devices.system_sources || []).length === 0;
-    $("macNote").textContent = none
-      ? "未检测到系统声音源（BlackHole）。本次将只录麦克风；如需内录请参考使用说明配置。"
-      : "";
-    $("macNote").classList.toggle("hidden", !none);
+    const sysNone = (st.devices.system_sources || []).length === 0;
+    $("macNote").textContent = !st.loopback_ready
+      ? "首次点击录音会自动安装录音驱动并完成配置（仅需一次管理员密码）。"
+      : (sysNone ? "未检测到系统声音源，本次将只录麦克风。" : "");
+    $("macNote").classList.toggle("hidden", st.loopback_ready && !sysNone);
   }
 }
 
@@ -507,15 +524,41 @@ async function loadDevices(){
 }
 
 /* ---------- 动作 ---------- */
+async function tryStartRecording(){
+  const r = await pywebview.api.start_recording(
+    $("titleInput").value, $("systemSelect").value || "", $("micSelect").value || "");
+  if(r.need_setup){
+    $("setupOverlay").classList.remove("hidden");
+    return;
+  }
+  if(!r.ok) toast(r.error);
+}
+
 $("btnRecord").addEventListener("click", async () => {
   const st = await pywebview.api.get_status();
   if(st.phase === "recording"){
     const r = await pywebview.api.stop_recording();
     if(!r.ok) toast(r.error);
   }else if(st.phase === "idle" || st.phase === "done" || st.phase === "error"){
-    const r = await pywebview.api.start_recording(
-      $("titleInput").value, $("systemSelect").value || "", $("micSelect").value || "");
-    if(!r.ok) toast(r.error);
+    await tryStartRecording();
+  }
+});
+
+$("btnSetupCancel").addEventListener("click", () => $("setupOverlay").classList.add("hidden"));
+$("btnSetupInstall").addEventListener("click", async () => {
+  const btn = $("btnSetupInstall");
+  btn.disabled = true; btn.textContent = "安装中…（请在密码框输入开机密码）";
+  try{
+    const r = await pywebview.api.setup_loopback();
+    if(r.ok){
+      $("setupOverlay").classList.add("hidden");
+      toast("驱动安装成功，即将开始录音");
+      await tryStartRecording();
+    }else{
+      toast(r.error || "安装失败");
+    }
+  }finally{
+    btn.disabled = false; btn.textContent = "一键安装并开始录音";
   }
 });
 
