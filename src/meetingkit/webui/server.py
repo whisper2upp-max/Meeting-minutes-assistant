@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import threading
@@ -272,6 +273,14 @@ class Api:
                 audio_path = session / pipeline_mod.AUDIO_WAV
                 dur = audio_mod.mix_to_session_audio(specs, audio_path)
                 _state.log(f"已混为单声道 16kHz：{dur / 60:.1f} 分钟")
+                # 全程静音守卫：避免把无声文件送去云端白跑一趟
+                import numpy as _np
+                from .audio.base import read_wav_mono as _read
+                _x, _ = _read(audio_path)
+                if float(_np.sqrt(_np.mean(_np.square(_x)))) < 1e-4:
+                    raise RuntimeError(
+                        "录音全程静音：最常见原因是麦克风权限未授予。"
+                        "请到 系统设置 → 隐私与安全性 → 麦克风，勾选“会议纪要助手”后重试。")
                 audio_path = audio_path
             minutes = pipeline_mod.run_pipeline(
                 audio_path, cfg, session_dir=session, title=title,
@@ -341,6 +350,43 @@ def _reveal(d: Path, select: Optional[Path] = None) -> None:
         _state.log(f"打开目录失败：{exc}")
 
 
+def _run_autotest(api: "Api", seconds: int, audio: str) -> None:
+    """隐藏自动验收（MEETINGKIT_AUTOTEST=秒数）：自动录音→播放测试音频→停止→跑完管线→退出。"""
+    import json as _json
+    import time as _t
+    result = {"phase": "error", "error": None, "session": None, "minutes": None}
+    try:
+        _t.sleep(2.5)  # 等窗口起来
+        r = api.start_recording("自动验收", "", "")
+        if not r.get("ok"):
+            raise RuntimeError(r.get("error", "启动失败"))
+        _t.sleep(2)
+        player = None
+        if audio:
+            import subprocess as _sp
+            player = _sp.Popen(["afplay", audio])
+        _t.sleep(seconds)
+        api.stop_recording()
+        for _ in range(240):  # 等管线完成（含云端转写），最多 4 分钟
+            _t.sleep(1)
+            st = api.get_status()
+            if st["phase"] in ("done", "error"):
+                break
+        result = {"phase": st["phase"], "error": st.get("error"),
+                  "session": st.get("session_dir"),
+                  "minutes": (st.get("result") or {}).get("minutes")}
+    except Exception as exc:
+        result["error"] = f"{exc}"
+    finally:
+        if player and player.poll() is None:
+            player.terminate()
+        Path("/tmp/mk_autotest_result.json").write_text(
+            _json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
+        _t.sleep(1)
+        if _window is not None:
+            _window.destroy()
+
+
 def main() -> None:
     global _window
     api = Api()
@@ -354,6 +400,10 @@ def main() -> None:
             min_size=(960, 680),
             background_color="#f4f5f7",
         )
+        autotest = os.environ.get("MEETINGKIT_AUTOTEST")
+        if autotest:
+            _spawn(_run_autotest, api, int(autotest),
+                   os.environ.get("MEETINGKIT_AUTOTEST_AUDIO", ""))
         webview.start()
     except Exception:
         # webview 起不来（极端环境）时由上层回退到 Tkinter 简版界面
