@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import queue
 import threading
+import time
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -93,16 +94,26 @@ class MacRecorder:
         else:
             self._errors.append("未找到系统声音源（BlackHole）。"
                                 "本次将只录麦克风；如需内录请参见使用说明配置 BlackHole。")
-        try:
-            self._open(_resolve_device(self._mic_name), "mic", out_dir)
-        except Exception as exc:
-            # 麦克风是必需轨道：失败立即终止，不能默默继续录（无麦克风授权时
-            # 系统还会把其它输入轨一并静默置零，继续录只会得到全静音文件）
+        # 麦克风是必需轨道；首次使用时 macOS 授权弹窗可能还悬在屏幕上，
+        # 这里留出约 13 秒重试窗口等用户点「允许」，而不是立刻失败
+        mic_err: Exception | None = None
+        for attempt in range(6):
+            try:
+                self._open(_resolve_device(self._mic_name), "mic", out_dir)
+                mic_err = None
+                break
+            except Exception as exc:
+                mic_err = exc
+                if attempt < 5:
+                    self._errors.append(
+                        f"等待麦克风就绪/授权（第 {attempt + 1}/6 次，若屏幕上有授权弹窗请点「好」）…")
+                    time.sleep(2.5)
+        if mic_err is not None:
             self.stop()
             raise RuntimeError(
-                "麦克风无法打开（常见原因：未授权或被拒绝）。请到 "
-                "系统设置 → 隐私与安全性 → 麦克风，勾选“会议纪要助手”后重试。"
-            ) from exc
+                f"麦克风无法打开：{mic_err}。请到 系统设置 → 隐私与安全性 → 麦克风，"
+                f"勾选“会议纪要助手”后【完全退出并重新打开】本程序再试。"
+            ) from mic_err
         if not self._streams:
             self.stop()
             raise RuntimeError("没有任何可用录音设备（请检查麦克风权限与设备连接）")
