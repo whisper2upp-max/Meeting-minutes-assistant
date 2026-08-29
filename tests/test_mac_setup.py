@@ -10,11 +10,11 @@ def test_blackhole_installed():
     assert mac_setup.blackhole_installed(), "本机应已安装 BlackHole（开发机）"
 
 
-def test_bundled_driver_available():
+def test_bundled_pkg_available():
     from meetingkit.audio import mac_setup
-    p = mac_setup.bundled_driver_path()
-    assert p is not None and p.exists(), "assets/ 应内置驱动（打包与开发态至少命中其一）"
-    assert (p / "Contents" / "Info.plist").exists()
+    p = mac_setup.bundled_pkg_path()
+    assert p is not None and p.exists(), "assets/ 应内置驱动安装包（打包与开发态至少命中其一）"
+    assert p.stat().st_size > 50_000, "pkg 应为完整的安装包（约 100KB）"
 
 
 def test_list_devices_has_output():

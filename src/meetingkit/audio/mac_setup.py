@@ -137,44 +137,60 @@ def blackhole_installed() -> bool:
     return Path("/Library/Audio/Plug-Ins/HAL/BlackHole2ch.driver").exists()
 
 
-def bundled_driver_path() -> Path | None:
-    """内置驱动位置：打包后在 _MEIPASS/meetingkit/assets/，开发态在项目 assets/。"""
+def bundled_pkg_path() -> Path | None:
+    """内置驱动安装包位置：打包后在 _MEIPASS/meetingkit/assets/，开发态在项目 assets/。
+
+    注意：必须用官方 .pkg 而不是裸驱动目录——PyInstaller 会把数据目录里的
+    Mach-O 可执行文件过滤掉，导致复制安装出“空壳”驱动无法加载。
+    """
     candidates = []
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass:
-        candidates.append(Path(meipass) / "meetingkit" / "assets" / "BlackHole2ch.driver")
+        candidates.extend(sorted((Path(meipass) / "meetingkit" / "assets").glob("BlackHole2ch*.pkg")))
     root = Path(__file__).resolve().parents[3]  # src/meetingkit/audio/ -> 项目根
-    candidates.append(root / "assets" / "BlackHole2ch.driver")
+    candidates.extend(sorted((root / "assets").glob("BlackHole2ch*.pkg")))
     for c in candidates:
         if c.exists():
             return c
     return None
 
 
+def _blackhole_in_devices() -> bool:
+    try:
+        return any("blackhole" in d["uid"].lower() for d in list_devices())
+    except Exception:
+        return False
+
+
 def install_blackhole() -> tuple[bool, str]:
-    """把内置驱动装入系统（弹一次管理员密码框），成功后重启音频服务。"""
-    if blackhole_installed():
+    """安装内置 BlackHole 驱动（弹一次管理员密码框），完成并确认设备可用。"""
+    if blackhole_installed() and _blackhole_in_devices():
         return True, "BlackHole 已安装"
-    src = bundled_driver_path()
-    if src is None:
-        return False, "安装包内未找到驱动文件，请手动安装：brew install blackhole-2ch"
+    pkg = bundled_pkg_path()
+    if pkg is None:
+        return False, "安装包内未找到驱动安装包，请手动安装：brew install blackhole-2ch"
     script = (
-        f"mkdir -p /Library/Audio/Plug-Ins/HAL && "
-        f"rm -rf /Library/Audio/Plug-Ins/HAL/BlackHole2ch.driver && "
-        f"cp -R '{src}' /Library/Audio/Plug-Ins/HAL/ && "
-        f"killall coreaudiod"
+        f"/usr/sbin/installer -pkg '{pkg}' -target / && killall coreaudiod"
     )  # 路径用 shell 单引号：避免与 AppleScript 的双引号字符串冲突
     try:
-        subprocess.run(
+        r = subprocess.run(
             ["osascript", "-e",
              f'do shell script "{script}" with administrator privileges'],
-            capture_output=True, text=True, timeout=120)
+            capture_output=True, text=True, timeout=180)
     except subprocess.TimeoutExpired:
-        return False, "安装超时（密码框 2 分钟无操作）"
+        return False, "安装超时（密码框 3 分钟无操作）"
     if not blackhole_installed():
-        return False, "驱动安装失败，请重试或手动安装：brew install blackhole-2ch"
+        detail = (r.stderr or "").strip()[:200]
+        return False, f"驱动安装失败 {detail}，可重试或手动安装：brew install blackhole-2ch"
+    # coreaudiod 重启后插件注册需要一点时间，等待设备真正出现
+    import time as _t
+    for _ in range(15):
+        if _blackhole_in_devices():
+            _rescan_portaudio()
+            return True, "驱动安装完成"
+        _t.sleep(1)
     _rescan_portaudio()
-    return True, "驱动安装完成"
+    return False, "驱动已复制但系统未加载（可重启电脑后重试）"
 
 
 def _rescan_portaudio() -> None:

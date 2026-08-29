@@ -51,7 +51,7 @@ jobs:
             --name "会议纪要助手" \
             --paths src \
             --add-data "src/meetingkit/webui/index.html:meetingkit/webui" \
-            --add-data "assets/BlackHole2ch.driver:meetingkit/assets/BlackHole2ch.driver" \
+            --add-data "assets/BlackHole2ch-0.7.1.pkg:meetingkit/assets/" \
             --hidden-import meetingkit.audio.macos_rec \
             --hidden-import webview.platforms.cocoa \
             --icon assets/app.icns \
