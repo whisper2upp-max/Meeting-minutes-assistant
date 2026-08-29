@@ -1,0 +1,33 @@
+# 配置示例。实际配置存放在 ~/.meetingkit/config.toml（首次在界面"设置"里填写后自动生成）
+# API Key 不要写进本文件，也不要提交到任何仓库。
+
+[api]
+# 百炼 API Key，在界面设置中填写即可，或通过环境变量 DASHSCOPE_API_KEY 提供
+key = ""
+# API 网关主机（公司专属网关时填写，如 https://ws-xxx.cn-beijing.maas.aliyuncs.com；留空=官方端点）
+host = ""
+
+[models]
+# 转写模型（百炼录音文件识别，支持说话人分离）
+transcribe_model = "fun-asr"
+# 纪要生成模型（OpenAI 兼容端点）
+llm_model = "qwen-flash"
+
+[recording]
+sample_rate = 16000
+# 系统声音来源设备名（macOS 需选择 BlackHole；Windows 留空=默认输出内录）
+system_source = ""
+# 麦克风设备名，留空=系统默认
+microphone = ""
+
+[transcription]
+diarization = true          # 说话人分离（要求单声道，程序会自动混单声道）
+disfluency_removal = true   # 去除语气词（嗯、啊等）
+
+[minutes]
+# 参会人名单（一行一个的纯文本在界面中维护），用于把"说话人1/2"映射为姓名
+attendees = []
+
+[output]
+# 输出目录，留空 = ~/Documents/会议纪要
+dir = ""

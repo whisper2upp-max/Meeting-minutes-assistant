@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.pyc
+dist/
+build/
+*.spec
+.pytest_cache/
+outputs/
+*.egg-info/
+.DS_Store
+
+# 密钥与本地敏感信息，绝不提交
+百炼.md
+*.key
+
+# 本地会话/工具产物
+.zcode/
+nohup.out
+*.pid
+*.log

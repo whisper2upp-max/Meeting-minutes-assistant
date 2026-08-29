@@ -1,0 +1,64 @@
+name: build-app
+
+# 手动触发，或推送到 main 时自动构建
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  windows:
+    name: 打包 Windows exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装依赖
+        run: pip install -r requirements.txt pyinstaller
+      - name: 打包 exe
+        run: >
+          pyinstaller --noconfirm --clean --windowed
+          --name "会议纪要助手"
+          --paths src
+          --add-data "src\meetingkit\webui\index.html;meetingkit\webui"
+          --hidden-import meetingkit.audio.windows_rec
+          --hidden-import pyaudiowpatch
+          --hidden-import webview.platforms.winforms
+          --hidden-import webview.platforms.edgechromium
+          --icon assets\app.ico
+          run_app.py
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: meetingkit-windows-exe
+          path: dist/会议纪要助手.exe
+
+  macos:
+    name: 打包 macOS app
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装依赖
+        run: pip install -r requirements.txt pyinstaller
+      - name: 打包 app
+        run: |
+          pyinstaller --noconfirm --clean --windowed \
+            --name "会议纪要助手" \
+            --paths src \
+            --add-data "src/meetingkit/webui/index.html:meetingkit/webui" \
+            --hidden-import meetingkit.audio.macos_rec \
+            --hidden-import webview.platforms.cocoa \
+            --icon assets/app.icns \
+            --osx-bundle-identifier com.meetingkit.app \
+            run_app.py
+          zip -r -y "dist/会议纪要助手-macOS.zip" "dist/会议纪要助手.app"
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: meetingkit-macos-app
+          path: dist/会议纪要助手-macOS.zip

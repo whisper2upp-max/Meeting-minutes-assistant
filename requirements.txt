@@ -1,0 +1,15 @@
+# 运行时依赖（打包分发只需要这些）
+dashscope>=1.27
+openai>=1.40
+requests>=2.28
+numpy>=1.26
+sounddevice>=0.4.6
+tomli-w>=1.0
+tomli>=2.0; python_version < '3.11'
+pywebview>=5.0
+# Windows 独有：WASAPI 内录
+pyaudiowpatch>=0.2.12; sys_platform == 'win32'
+
+# 开发/打包（无需随程序分发）
+# pip install pyinstaller
+# pip install pytest
