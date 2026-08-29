@@ -387,6 +387,18 @@ def _run_autotest(api: "Api", seconds: int, audio: str) -> None:
             _window.destroy()
 
 
+def _on_closing() -> bool:
+    """录音/处理进行中关闭窗口时拦截确认，避免静默丢弃已录内容。"""
+    if not _state.busy():
+        return True
+    try:
+        r = _window.evaluate_js(
+            "confirm('录音或处理正在进行中，确定放弃并退出？（已录制的原始轨道会保留在会话目录）')")
+        return bool(r)
+    except Exception:
+        return True
+
+
 def main() -> None:
     global _window
     api = Api()
@@ -404,6 +416,7 @@ def main() -> None:
         if autotest:
             _spawn(_run_autotest, api, int(autotest),
                    os.environ.get("MEETINGKIT_AUTOTEST_AUDIO", ""))
+        _window.events.closing += _on_closing
         webview.start()
     except Exception:
         # webview 起不来（极端环境）时由上层回退到 Tkinter 简版界面

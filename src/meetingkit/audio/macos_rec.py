@@ -96,7 +96,13 @@ class MacRecorder:
         try:
             self._open(_resolve_device(self._mic_name), "mic", out_dir)
         except Exception as exc:
-            self._errors.append(f"麦克风打开失败：{exc}")
+            # 麦克风是必需轨道：失败立即终止，不能默默继续录（无麦克风授权时
+            # 系统还会把其它输入轨一并静默置零，继续录只会得到全静音文件）
+            self.stop()
+            raise RuntimeError(
+                "麦克风无法打开（常见原因：未授权或被拒绝）。请到 "
+                "系统设置 → 隐私与安全性 → 麦克风，勾选“会议纪要助手”后重试。"
+            ) from exc
         if not self._streams:
             self.stop()
             raise RuntimeError("没有任何可用录音设备（请检查麦克风权限与设备连接）")
