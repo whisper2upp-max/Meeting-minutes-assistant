@@ -26,14 +26,23 @@ def get_recorder(system_source: str = "", microphone: str = ""):
 def list_devices() -> dict:
     """供界面展示的设备列表：{'microphones': [...], 'system_sources': [...]}。"""
     if IS_WINDOWS:
-        from .windows_rec import list_mic_names
-        mics = list_mic_names()
-        return {"microphones": mics, "system_sources": []}  # Windows 用默认输出内录，无需选择
+        from .windows_rec import microphone_device_summary
+        devices = microphone_device_summary()
+        devices["system_sources"] = []  # Windows 用默认输出内录，无需选择
+        return devices
     if IS_MACOS:
         from .macos_rec import list_microphones, list_loopback_sources
         return {"microphones": list_microphones(),
                 "system_sources": list_loopback_sources()}
     return {"microphones": [], "system_sources": []}
+
+
+def get_mic_monitor(microphone: str = ""):
+    """返回 Windows 麦克风实时回听器。"""
+    if not IS_WINDOWS:
+        raise RuntimeError("麦克风实时测试目前仅在 Windows 版本提供")
+    from .windows_rec import WindowsMicMonitor
+    return WindowsMicMonitor(microphone)
 
 
 def mix_to_session_audio(specs: List[TrackSpec], out_wav: Path) -> float:
