@@ -78,9 +78,12 @@ class WindowsRecorder:
         # loopback 流按设备混合格式（通常 2 声道）打开，写入时自动降混单声道
         channels = min(2, int(dev.get("maxInputChannels", 2)) or 2)
         writer = WavTrackWriter(out_dir / "track_system.wav", rate, channels)
+        # PyAudioWPatch 把 WASAPI loopback 暴露为可直接读取的虚拟输入设备。
+        # 只需打开它的 input_device_index；PyAudio 的 Stream 构造器没有
+        # ``as_loopback`` 参数（该参数属于其他音频库的接口）。
         stream = self._pa.open(
             format=pyaudio.paInt16, channels=channels, rate=rate, input=True,
-            input_device_index=int(dev["index"]), as_loopback=True,
+            input_device_index=int(dev["index"]),
             frames_per_buffer=_BLOCK_FRAMES,
         )
         self._streams.append(stream)
