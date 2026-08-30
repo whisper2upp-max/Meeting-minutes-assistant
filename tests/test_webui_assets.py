@@ -75,3 +75,20 @@ def test_windows_release_builds_and_requires_a_single_executable():
     assert "--windowed --onefile" in workflow
     assert "--windowed --onefile" in windows_script
     assert "if-no-files-found: error" in workflow
+
+
+def test_release_builds_embed_version_metadata():
+    workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
+    macos_script = (ROOT / "scripts" / "build_macos.sh").read_text(encoding="utf-8")
+    windows_script = (ROOT / "scripts" / "build_windows.bat").read_text(encoding="utf-8")
+    windows_version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
+
+    assert '--version-file assets\\version_info.txt' in workflow
+    assert '--version-file assets\\version_info.txt' in windows_script
+    for content in (workflow, macos_script):
+        assert "Set :CFBundleShortVersionString 0.1.0" in content
+        assert "Set :CFBundleVersion 0.1.0" in content
+    assert "filevers=(0, 1, 0, 0)" in windows_version
+    assert "prodvers=(0, 1, 0, 0)" in windows_version
+    assert "StringStruct('FileVersion', '0.1.0')" in windows_version
+    assert "StringStruct('ProductVersion', '0.1.0')" in windows_version

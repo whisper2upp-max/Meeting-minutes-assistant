@@ -17,6 +17,7 @@ if not exist .venv\Scripts\python.exe (
   --hidden-import pyaudiowpatch ^
   --hidden-import webview.platforms.winforms ^
   --hidden-import webview.platforms.edgechromium ^
+  --version-file assets\version_info.txt ^
   --icon assets\app.ico ^
   run_app.py
 
