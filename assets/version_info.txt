@@ -15,11 +15,11 @@ VSVersionInfo(
                 StringTable(
                     '040904B0',
                     [
-                        StringStruct('CompanyName', 'Wesley Yan'),
+                        StringStruct('CompanyName', 'whisper2upp-max'),
                         StringStruct('FileDescription', 'Meeting Minutes Assistant'),
                         StringStruct('FileVersion', '0.1.1'),
                         StringStruct('InternalName', 'meeting-minutes-assistant'),
-                        StringStruct('LegalCopyright', 'Copyright (c) 2026 Wesley Yan'),
+                        StringStruct('LegalCopyright', 'Copyright (c) 2026 whisper2upp-max'),
                         StringStruct('OriginalFilename', '会议纪要助手.exe'),
                         StringStruct('ProductName', 'Meeting Minutes Assistant'),
                         StringStruct('ProductVersion', '0.1.1'),
