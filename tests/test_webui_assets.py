@@ -115,3 +115,15 @@ def test_windows_release_uses_native_certificate_store():
     assert "--hidden-import truststore._windows" in workflow
     assert "--hidden-import truststore._windows" in windows_script
     assert workflow.count("python -m pytest") == 2
+
+
+def test_release_metadata_uses_github_identity_not_conversational_name():
+    windows_version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    javascript = (WEBUI / "app.js").read_text(encoding="utf-8")
+
+    assert "StringStruct('CompanyName', 'whisper2upp-max')" in windows_version
+    assert "Copyright (c) 2026 whisper2upp-max" in windows_version
+    assert "[@whisper2upp-max]" in readme
+    for content in (windows_version, readme, javascript):
+        assert "Wesley Yan" not in content

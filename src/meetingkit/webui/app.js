@@ -895,7 +895,7 @@ window.setTimeout(() => {
     if (state.activeView === "minutes") {
       state.activeMinutes = "preview/会议纪要.md";
       $("minutesBody").classList.remove("empty");
-      $("minutesBody").innerHTML = markdownToHtml("# 产品周会纪要\n\n## 会议摘要\n本周功能开发已完成，团队确认进入内部验收阶段。\n\n## 关键决策\n- 先完成桌面端体验验收，再准备同事分发包。\n- 保留本机优先的数据存储方式。\n\n## 行动事项\n| 行动项 | 负责人 | 截止时间 |\n| --- | --- | --- |\n| 完成界面验收 | Wesley Yan | 本周五 |\n| 整理发布说明 | 产品团队 | 下周一 |");
+      $("minutesBody").innerHTML = markdownToHtml("# 产品周会纪要\n\n## 会议摘要\n本周功能开发已完成，团队确认进入内部验收阶段。\n\n## 关键决策\n- 先完成桌面端体验验收，再准备同事分发包。\n- 保留本机优先的数据存储方式。\n\n## 行动事项\n| 行动项 | 负责人 | 截止时间 |\n| --- | --- | --- |\n| 完成界面验收 | 项目负责人 | 本周五 |\n| 整理发布说明 | 产品团队 | 下周一 |");
       $("documentTitle").value = "产品周会纪要";
       $("minutesPath").textContent = "~/Documents/会议纪要/产品周会/会议纪要.md";
       $("documentTime").textContent = "2026-08-29 22:30";

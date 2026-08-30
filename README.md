@@ -120,4 +120,4 @@ src/meetingkit/
 └── prompt.py    # 结构化纪要提示词
 ```
 
-版本记录见 [CHANGELOG.md](CHANGELOG.md)。项目由 **Wesley Yan** 维护。
+版本记录见 [CHANGELOG.md](CHANGELOG.md)。项目由 [@whisper2upp-max](https://github.com/whisper2upp-max) 维护。
