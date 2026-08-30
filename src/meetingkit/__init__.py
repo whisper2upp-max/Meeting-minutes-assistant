@@ -2,7 +2,9 @@
 
 import os
 
-__version__ = "0.1.0"
+from .tls import enable_windows_system_trust
+
+__version__ = "0.1.1"
 
 
 def _bypass_proxy_for_aliyun() -> None:
@@ -20,4 +22,5 @@ def _bypass_proxy_for_aliyun() -> None:
             os.environ[var] = f"{cur},{domain}" if cur else domain
 
 
+WINDOWS_SYSTEM_TRUST_ACTIVE = enable_windows_system_trust()
 _bypass_proxy_for_aliyun()

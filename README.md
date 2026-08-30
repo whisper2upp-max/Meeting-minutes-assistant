@@ -2,7 +2,7 @@
 
 > 会议纪要助手：同步录制会议内声与麦克风，或导入已有音视频，自动完成说话人分离、全文转写和结构化会议纪要。
 
-[![Version](https://img.shields.io/badge/version-0.1.0-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.1.1-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-18213d.svg)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0aa6b5.svg)
 
@@ -12,7 +12,7 @@
 
 ## 下载
 
-前往 [Releases](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest) 下载对应平台的 v0.1.0 安装包。
+前往 [Releases](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest) 下载对应平台的 v0.1.1 安装包。
 
 | 平台 | 发布文件 | 首次启动 |
 | --- | --- | --- |
@@ -68,6 +68,8 @@
 4. 处理完成后在“纪要编辑”中检查说话人、决策和行动事项。
 
 macOS 首次录制时，应用会提示安装内置 BlackHole 2ch 驱动，并请求麦克风权限。Windows 使用 WASAPI loopback，无需另外安装内录驱动。
+
+Windows v0.1.1 起使用系统证书库校验百炼 HTTPS 连接，兼容由公司统一下发并受 Windows 信任的企业根证书，无需导出证书或关闭安全校验。
 
 ## 数据与隐私
 

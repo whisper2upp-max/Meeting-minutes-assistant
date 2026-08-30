@@ -207,6 +207,8 @@ class Api:
                 rec.start(session)
             except Exception as exc:
                 raise RuntimeError(f"启动录音失败：{exc}")
+            if IS_WINDOWS:
+                _state.log("会议内声已启用：Windows 默认输出设备（WASAPI 自动内录）")
             for msg in getattr(rec, "last_errors", []):
                 _state.log(f"⚠️ {msg}")
             _state.set(recorder=rec)

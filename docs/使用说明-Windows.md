@@ -9,9 +9,10 @@ Windows 无需任何驱动或管理员权限——系统声音通过 WASAPI 内�
 1. 获取百炼 API Key：登录阿里云百炼控制台（公司已认证）→ API-KEY 管理 → 创建 Key
 2. 解压/双击运行「会议纪要助手.exe」；若 SmartScreen 弹窗：**更多信息 → 仍要运行**
 3. 点「设置…」→ 填入 API Key；**公司专属网关用户再填写"API 网关"**（形如 `https://ws-xxx.cn-beijing.maas.aliyuncs.com`，见百炼开通说明中的 API Host）→ 保存
-4. 麦克风下拉框确认选中你要用的耳机麦克风（默认取系统默认输入）
+4. “会议内声”会显示“系统默认输出设备（WASAPI 自动内录）”，无需手动选择；麦克风下拉框确认选中你要用的耳机麦克风（默认取系统默认输入）
 
 > 网络说明：程序自动对 `aliyuncs.com` 域绕过本机代理，开了 Clash 等代理软件也不用关。
+> v0.1.1 起，程序使用 Windows 系统证书库校验 HTTPS，自动兼容由公司统一下发并受系统信任的企业证书。
 
 ## 二、日常使用
 
@@ -43,6 +44,7 @@ Windows 无需任何驱动或管理员权限——系统声音通过 WASAPI 内�
 | 只有别人的声音 | 麦克风选错了；Windows 设置 → 隐私 → 麦克风 → 允许应用访问 |
 | 提示"未配置 API Key" | 设置里重新填写并保存 |
 | 上传/转写失败 | 检查网络/代理对 dashscope.aliyuncs.com 的访问 |
+| `CERTIFICATE_VERIFY_FAILED` | 先确认版本不低于 v0.1.1；若 `curl.exe -I https://dashscope.aliyuncs.com` 也报证书错误，请联系 IT 检查证书链 |
 
 ## ⚠️ 合规提醒
 

@@ -10,6 +10,7 @@ from typing import Callable, List, Optional
 from openai import OpenAI, APIConnectionError, APIStatusError, RateLimitError
 
 from ..prompt import build_minutes_prompt
+from ..tls import certificate_error_help, is_certificate_verification_error
 
 Progress = Callable[[str, str], None]
 
@@ -55,6 +56,8 @@ def generate_minutes(
             return _strip_code_fence(content)
         except (APIConnectionError, APIStatusError, RateLimitError, RuntimeError) as exc:
             last_exc = exc
+            if is_certificate_verification_error(exc):
+                raise RuntimeError(f"生成会议纪要失败：{certificate_error_help()}") from exc
             if attempt < _MAX_RETRIES:
                 if progress:
                     progress("minutes", f"调用失败（{exc}），{_RETRY_BACKOFF_SEC * attempt}s 后重试 {attempt + 1}/{_MAX_RETRIES}…")
