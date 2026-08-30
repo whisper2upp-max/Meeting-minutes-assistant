@@ -5,6 +5,7 @@ WASAPI loopback 由系统自带，免驱动、免管理员权限；默认输出�
 
 from __future__ import annotations
 
+import queue
 import threading
 from pathlib import Path
 from typing import List, Optional
@@ -12,6 +13,7 @@ from typing import List, Optional
 from .base import WavTrackWriter, TrackSpec
 
 _BLOCK_FRAMES = 2048
+_QUEUE_STOP = object()
 
 
 def list_microphones() -> List[str]:
@@ -42,19 +44,47 @@ class WindowsRecorder:
         self._streams = []
         self._writers: List[WavTrackWriter] = []
         self._specs: List[TrackSpec] = []
+        self._queues: List[queue.SimpleQueue] = []
         self._threads: List[threading.Thread] = []
         self._stopped = threading.Event()
         self._open_error: Optional[str] = None
 
-    def _reader_loop(self, stream, writer: WavTrackWriter) -> None:
-        while not self._stopped.is_set():
-            try:
-                data = stream.read(_BLOCK_FRAMES, exception_on_overflow=False)
-                writer.write(data[0] if isinstance(data, tuple) else data)
-            except OSError as exc:
-                if not self._stopped.is_set():
-                    self._open_error = f"录音流中断：{exc}"
-                break
+    def _make_callback(self, audio_queue: queue.SimpleQueue):
+        import pyaudiowpatch as pyaudio
+
+        def _callback(in_data, frame_count, time_info, status_flags):
+            if status_flags and not self._stopped.is_set():
+                self._open_error = f"录音流状态异常：{status_flags}"
+            if self._stopped.is_set():
+                return in_data, pyaudio.paComplete
+            audio_queue.put(in_data)
+            return in_data, pyaudio.paContinue
+
+        return _callback
+
+    @staticmethod
+    def _writer_loop(audio_queue: queue.SimpleQueue,
+                     writer: WavTrackWriter) -> None:
+        while True:
+            data = audio_queue.get()
+            if data is _QUEUE_STOP:
+                return
+            writer.write(data)
+
+    def _register_stream(self, stream, writer: WavTrackWriter,
+                         spec: TrackSpec,
+                         audio_queue: queue.SimpleQueue) -> None:
+        self._streams.append(stream)
+        self._writers.append(writer)
+        self._specs.append(spec)
+        self._queues.append(audio_queue)
+        thread = threading.Thread(
+            target=self._writer_loop,
+            args=(audio_queue, writer),
+            daemon=True,
+        )
+        self._threads.append(thread)
+        thread.start()
 
     def _open_loopback(self, out_dir: Path) -> None:
         import pyaudiowpatch as pyaudio
@@ -78,19 +108,22 @@ class WindowsRecorder:
         # loopback 流按设备混合格式（通常 2 声道）打开，写入时自动降混单声道
         channels = min(2, int(dev.get("maxInputChannels", 2)) or 2)
         writer = WavTrackWriter(out_dir / "track_system.wav", rate, channels)
+        audio_queue = queue.SimpleQueue()
         # PyAudioWPatch 把 WASAPI loopback 暴露为可直接读取的虚拟输入设备。
         # 只需打开它的 input_device_index；PyAudio 的 Stream 构造器没有
         # ``as_loopback`` 参数（该参数属于其他音频库的接口）。
-        stream = self._pa.open(
-            format=pyaudio.paInt16, channels=channels, rate=rate, input=True,
-            input_device_index=int(dev["index"]),
-            frames_per_buffer=_BLOCK_FRAMES,
-        )
-        self._streams.append(stream)
-        self._writers.append(writer)
-        self._specs.append(TrackSpec(writer.path, rate, "system"))
-        self._threads.append(threading.Thread(target=self._reader_loop,
-                                              args=(stream, writer), daemon=True))
+        try:
+            stream = self._pa.open(
+                format=pyaudio.paInt16, channels=channels, rate=rate, input=True,
+                input_device_index=int(dev["index"]),
+                frames_per_buffer=_BLOCK_FRAMES,
+                stream_callback=self._make_callback(audio_queue),
+            )
+        except Exception:
+            writer.close()
+            raise
+        self._register_stream(
+            stream, writer, TrackSpec(writer.path, rate, "system"), audio_queue)
 
     def _open_mic(self, out_dir: Path) -> None:
         import pyaudiowpatch as pyaudio
@@ -107,16 +140,19 @@ class WindowsRecorder:
             return
         rate = int(self._pa.get_device_info_by_index(dev_idx)["defaultSampleRate"])
         writer = WavTrackWriter(out_dir / "track_mic.wav", rate)
-        stream = self._pa.open(
-            format=pyaudio.paInt16, channels=1, rate=rate, input=True,
-            input_device_index=dev_idx,
-            frames_per_buffer=_BLOCK_FRAMES,
-        )
-        self._streams.append(stream)
-        self._writers.append(writer)
-        self._specs.append(TrackSpec(writer.path, rate, "mic"))
-        self._threads.append(threading.Thread(target=self._reader_loop,
-                                              args=(stream, writer), daemon=True))
+        audio_queue = queue.SimpleQueue()
+        try:
+            stream = self._pa.open(
+                format=pyaudio.paInt16, channels=1, rate=rate, input=True,
+                input_device_index=dev_idx,
+                frames_per_buffer=_BLOCK_FRAMES,
+                stream_callback=self._make_callback(audio_queue),
+            )
+        except Exception:
+            writer.close()
+            raise
+        self._register_stream(
+            stream, writer, TrackSpec(writer.path, rate, "mic"), audio_queue)
 
     def start(self, out_dir: Path) -> None:
         import pyaudiowpatch as pyaudio
@@ -131,27 +167,40 @@ class WindowsRecorder:
         if not self._streams:
             self._cleanup()
             raise RuntimeError("没有可用的录音设备（loopback 与麦克风都打开失败）")
-        for t in self._threads:
-            t.start()
 
     def stop(self) -> List[TrackSpec]:
         if self._stopped.is_set():
             return self._specs
         self._stopped.set()
-        for s in self._streams:
-            try:
-                s.stop_stream()
-                s.close()
-            except Exception:
-                pass
-        for t in self._threads:
-            t.join(timeout=3)
         self._cleanup()
         return self._specs
 
     def _cleanup(self) -> None:
-        for w in self._writers:
-            w.close()
+        # PyAudio 的回调运行在原生音频线程中。必须先停止并关闭全部流，
+        # 确认不会再产生回调，再结束 Python 写盘线程；不能在另一个线程
+        # 阻塞于 stream.read() 时关闭同一个原生流。
+        streams, self._streams = self._streams, []
+        for stream in streams:
+            try:
+                stream.stop_stream()
+            except Exception:
+                pass
+            try:
+                stream.close()
+            except Exception:
+                pass
+
+        queues, self._queues = self._queues, []
+        for audio_queue in queues:
+            audio_queue.put(_QUEUE_STOP)
+
+        threads, self._threads = self._threads, []
+        for thread in threads:
+            thread.join()
+
+        writers, self._writers = self._writers, []
+        for writer in writers:
+            writer.close()
         if self._pa is not None:
             try:
                 self._pa.terminate()
