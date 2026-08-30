@@ -10,23 +10,52 @@ import threading
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+import numpy as np
+
 from .base import WavTrackWriter, TrackSpec
 
 _BLOCK_FRAMES = 2048
+_MONITOR_FRAMES = 1024
+_MONITOR_QUEUE_SIZE = 4
 _QUEUE_STOP = object()
 
 
-def list_microphones() -> List[str]:
-    """可选的麦克风设备名列表（仅真实 WASAPI 输入，按名称去重）。"""
+def _unique_microphone_names(devices: List[dict]) -> List[str]:
     names: List[str] = []
     seen = set()
-    for device in _list_input_devices():
+    for device in devices:
         name = str(device.get("name", "")).strip()
         key = name.casefold()
         if name and key not in seen:
             names.append(name)
             seen.add(key)
     return names
+
+
+def microphone_device_summary() -> dict:
+    """返回真实 WASAPI 麦克风列表和当前 Windows 默认麦克风名称。"""
+    import pyaudiowpatch as pyaudio
+
+    p = pyaudio.PyAudio()
+    try:
+        host, devices = _wasapi_input_devices(p)
+        default_index = int(host.get("defaultInputDevice", -1))
+        default = next(
+            (device for device in devices
+             if int(device.get("index", -1)) == default_index),
+            None,
+        )
+        return {
+            "microphones": _unique_microphone_names(devices),
+            "default_microphone": str(default.get("name", "")).strip() if default else "",
+        }
+    finally:
+        p.terminate()
+
+
+def list_microphones() -> List[str]:
+    """可选的麦克风设备名列表（仅真实 WASAPI 输入，按名称去重）。"""
+    return microphone_device_summary()["microphones"]
 
 
 def _wasapi_input_devices(p) -> Tuple[dict, List[dict]]:
@@ -60,18 +89,241 @@ def _wasapi_input_devices(p) -> Tuple[dict, List[dict]]:
     return host, devices
 
 
-def _list_input_devices() -> List[dict]:
-    import pyaudiowpatch as pyaudio
-    p = pyaudio.PyAudio()
-    try:
-        _, devices = _wasapi_input_devices(p)
-        return devices
-    finally:
-        p.terminate()
-
-
 def list_mic_names() -> List[str]:
     return list_microphones()
+
+
+def _resolve_microphone(p, microphone: str = "") -> Tuple[dict, dict]:
+    """按界面选择解析 WASAPI 麦克风；空字符串表示当前系统默认。"""
+    host, devices = _wasapi_input_devices(p)
+    default_index = int(host.get("defaultInputDevice", -1))
+    if microphone:
+        matches = [device for device in devices if device["name"] == microphone]
+        if not matches:
+            raise RuntimeError(
+                f"未找到已选麦克风“{microphone}”。"
+                "设备可能已拔出，请刷新设备后重新选择。"
+            )
+        device = next(
+            (item for item in matches if int(item["index"]) == default_index),
+            matches[0],
+        )
+        return host, device
+
+    device = next(
+        (item for item in devices if int(item["index"]) == default_index),
+        None,
+    )
+    if device is None:
+        raise RuntimeError(
+            "未检测到 Windows 默认麦克风。"
+            "请先在 Windows 设置 → 系统 → 声音 中选择默认输入设备。"
+        )
+    return host, device
+
+
+def _default_output_device(p, host: dict) -> dict:
+    """解析当前 WASAPI 默认播放端点，用于把测试声音送到耳机/扬声器。"""
+    default_index = int(host.get("defaultOutputDevice", -1))
+    if default_index < 0:
+        raise RuntimeError(
+            "未检测到 Windows 默认播放设备。请先连接扬声器或耳机并设为默认输出。"
+        )
+    try:
+        device = p.get_device_info_by_index(default_index)
+    except Exception as exc:
+        raise RuntimeError(
+            "无法读取 Windows 默认播放设备，请在声音设置中重新选择输出设备。"
+        ) from exc
+    if int(device.get("maxOutputChannels", 0)) <= 0:
+        raise RuntimeError("Windows 默认播放端点不可用，请重新选择扬声器或耳机。")
+    return device
+
+
+def _convert_monitor_chunk(data: bytes, input_channels: int, input_rate: int,
+                           output_channels: int, output_rate: int) -> bytes:
+    """把麦克风 PCM 安全转换为默认播放设备的声道数与采样率。"""
+    samples = np.frombuffer(data, dtype=np.int16)
+    usable = samples.size - (samples.size % input_channels)
+    if usable <= 0:
+        return b""
+    frames = samples[:usable].reshape(-1, input_channels).astype(np.float32)
+    mono = frames.mean(axis=1)
+    if input_rate != output_rate and mono.size > 1:
+        frame_count = max(1, int(round(mono.size * output_rate / input_rate)))
+        source_positions = np.arange(frame_count, dtype=np.float64) * input_rate / output_rate
+        source_positions = np.minimum(source_positions, mono.size - 1)
+        mono = np.interp(source_positions, np.arange(mono.size), mono)
+    converted = np.clip(np.rint(mono), -32768, 32767).astype(np.int16)
+    if output_channels > 1:
+        converted = np.repeat(converted[:, None], output_channels, axis=1).reshape(-1)
+    return converted.tobytes()
+
+
+class WindowsMicMonitor:
+    """将选中麦克风低延迟回放到当前 Windows 默认扬声器/耳机。"""
+
+    def __init__(self, microphone: str = ""):
+        self._microphone = microphone
+        self._pa = None
+        self._input_stream = None
+        self._output_stream = None
+        self._queue: queue.Queue = queue.Queue(maxsize=_MONITOR_QUEUE_SIZE)
+        self._worker: Optional[threading.Thread] = None
+        self._stopped = threading.Event()
+        self._active = threading.Event()
+        self._cleanup_lock = threading.Lock()
+        self._error: Optional[str] = None
+        self._input_channels = 1
+        self._input_rate = 48000
+        self._output_channels = 2
+        self._output_rate = 48000
+        self.input_name = ""
+        self.output_name = ""
+
+    def _put_latest(self, data) -> None:
+        try:
+            self._queue.put_nowait(data)
+            return
+        except queue.Full:
+            pass
+        try:
+            self._queue.get_nowait()
+        except queue.Empty:
+            pass
+        try:
+            self._queue.put_nowait(data)
+        except queue.Full:
+            pass
+
+    def _make_callback(self):
+        import pyaudiowpatch as pyaudio
+
+        def _callback(in_data, frame_count, time_info, status_flags):
+            if status_flags and not self._stopped.is_set():
+                self._error = f"麦克风测试流状态异常：{status_flags}"
+            if self._stopped.is_set():
+                return None, pyaudio.paComplete
+            self._put_latest(in_data)
+            return None, pyaudio.paContinue
+
+        return _callback
+
+    def _playback_loop(self) -> None:
+        try:
+            while not self._stopped.is_set():
+                data = self._queue.get()
+                if data is _QUEUE_STOP:
+                    return
+                converted = _convert_monitor_chunk(
+                    data,
+                    self._input_channels,
+                    self._input_rate,
+                    self._output_channels,
+                    self._output_rate,
+                )
+                if converted and self._output_stream is not None:
+                    self._output_stream.write(converted, exception_on_underflow=False)
+        except Exception as exc:
+            self._error = f"麦克风测试播放中断：{exc}"
+            self._stopped.set()
+        finally:
+            self._active.clear()
+
+    def start(self) -> None:
+        import pyaudiowpatch as pyaudio
+
+        if self.active:
+            return
+        self._stopped.clear()
+        self._error = None
+        self._pa = pyaudio.PyAudio()
+        try:
+            host, mic = _resolve_microphone(self._pa, self._microphone)
+            output = _default_output_device(self._pa, host)
+            self._input_channels = min(2, int(mic.get("maxInputChannels", 1)) or 1)
+            self._input_rate = int(mic["defaultSampleRate"])
+            self._output_channels = min(2, int(output.get("maxOutputChannels", 2)) or 2)
+            self._output_rate = int(output["defaultSampleRate"])
+            self.input_name = str(mic.get("name", "麦克风"))
+            self.output_name = str(output.get("name", "默认播放设备"))
+
+            self._output_stream = self._pa.open(
+                format=pyaudio.paInt16,
+                channels=self._output_channels,
+                rate=self._output_rate,
+                output=True,
+                output_device_index=int(output["index"]),
+                frames_per_buffer=_MONITOR_FRAMES,
+            )
+            self._input_stream = self._pa.open(
+                format=pyaudio.paInt16,
+                channels=self._input_channels,
+                rate=self._input_rate,
+                input=True,
+                input_device_index=int(mic["index"]),
+                frames_per_buffer=_MONITOR_FRAMES,
+                stream_callback=self._make_callback(),
+            )
+            self._active.set()
+            self._worker = threading.Thread(target=self._playback_loop, daemon=True)
+            self._worker.start()
+        except Exception:
+            self.stop()
+            raise
+
+    def stop(self) -> None:
+        with self._cleanup_lock:
+            self._stopped.set()
+            self._active.clear()
+
+            input_stream, self._input_stream = self._input_stream, None
+            if input_stream is not None:
+                try:
+                    input_stream.stop_stream()
+                except Exception:
+                    pass
+                try:
+                    input_stream.close()
+                except Exception:
+                    pass
+
+            while True:
+                try:
+                    self._queue.get_nowait()
+                except queue.Empty:
+                    break
+            self._put_latest(_QUEUE_STOP)
+
+            worker, self._worker = self._worker, None
+            if worker is not None and worker is not threading.current_thread():
+                worker.join(timeout=2)
+
+            output_stream, self._output_stream = self._output_stream, None
+            if output_stream is not None:
+                try:
+                    output_stream.stop_stream()
+                except Exception:
+                    pass
+                try:
+                    output_stream.close()
+                except Exception:
+                    pass
+
+            if self._pa is not None:
+                try:
+                    self._pa.terminate()
+                except Exception:
+                    pass
+                self._pa = None
+
+    @property
+    def active(self) -> bool:
+        return self._active.is_set() and not self._stopped.is_set()
+
+    @property
+    def last_error(self) -> Optional[str]:
+        return self._error
 
 
 class WindowsRecorder:
@@ -168,33 +420,7 @@ class WindowsRecorder:
     def _open_mic(self, out_dir: Path) -> None:
         import pyaudiowpatch as pyaudio
 
-        host, devices = _wasapi_input_devices(self._pa)
-        default_index = int(host.get("defaultInputDevice", -1))
-        dev = None
-        if self._mic_name:
-            matches = [d for d in devices if d["name"] == self._mic_name]
-            if matches:
-                # 极少数驱动会在同一 WASAPI 主机下重复同名端点；
-                # 同名时优先使用 Windows 默认输入。
-                dev = next(
-                    (d for d in matches if int(d["index"]) == default_index),
-                    matches[0],
-                )
-            else:
-                raise RuntimeError(
-                    f"未找到已选麦克风“{self._mic_name}”。"
-                    "设备可能已拔出，请刷新设备后重新选择。"
-                )
-        else:
-            dev = next(
-                (d for d in devices if int(d["index"]) == default_index),
-                None,
-            )
-            if dev is None:
-                raise RuntimeError(
-                    "未检测到 Windows 默认麦克风。"
-                    "请先在 Windows 设置 → 系统 → 声音 中选择默认输入设备。"
-                )
+        _, dev = _resolve_microphone(self._pa, self._mic_name)
 
         dev_idx = int(dev["index"])
         rate = int(dev["defaultSampleRate"])

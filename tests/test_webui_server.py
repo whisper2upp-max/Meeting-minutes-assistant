@@ -126,3 +126,72 @@ def test_list_sessions_returns_more_than_thirty_records(tmp_path, monkeypatch):
     result = server.Api().list_sessions()
 
     assert len(result["sessions"]) == 35
+
+
+def test_windows_reveal_opens_directory_itself_instead_of_selecting_parent(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(server.sys, "platform", "win32")
+    monkeypatch.setattr(server.subprocess, "Popen", lambda args: calls.append(args))
+
+    server._reveal(tmp_path)
+
+    assert calls == [["explorer.exe", str(tmp_path)]]
+
+
+def test_windows_reveal_selects_a_file_when_requested(tmp_path, monkeypatch):
+    minutes = tmp_path / "会议纪要.md"
+    minutes.write_text("# 测试", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(server.sys, "platform", "win32")
+    monkeypatch.setattr(server.subprocess, "Popen", lambda args: calls.append(args))
+
+    server._reveal(tmp_path, select=minutes)
+
+    assert calls == [["explorer.exe", f"/select,{minutes}"]]
+
+
+def test_open_output_dir_uses_the_configured_custom_path(tmp_path, monkeypatch):
+    custom = tmp_path / "Company Meetings"
+    opened = []
+    monkeypatch.setattr(server._state, "cfg", Config(output_dir=str(custom)))
+    monkeypatch.setattr(server, "_reveal", lambda path, select=None: opened.append(path))
+
+    result = server.Api().open_output_dir()
+
+    assert result == {"ok": True, "path": str(custom.resolve())}
+    assert opened == [custom.resolve()]
+
+
+class _FakeMicMonitor:
+    def __init__(self):
+        self.active = False
+        self.last_error = None
+        self.input_name = "USB Headset Mic"
+        self.output_name = "USB Headset"
+        self.stopped = False
+
+    def start(self):
+        self.active = True
+
+    def stop(self):
+        self.active = False
+        self.stopped = True
+
+
+def test_mic_test_lifecycle_is_exposed_in_status(monkeypatch):
+    monitor = _FakeMicMonitor()
+    monkeypatch.setattr(server, "IS_WINDOWS", True)
+    monkeypatch.setattr(server._state, "phase", "idle")
+    monkeypatch.setattr(server._state, "mic_monitor", None)
+    monkeypatch.setattr(server.audio_mod, "get_mic_monitor", lambda microphone: monitor)
+
+    started = server.Api().start_mic_test("USB Headset Mic")
+    status = server.Api().get_status()
+    stopped = server.Api().stop_mic_test()
+
+    assert started == {"ok": True, "input": "USB Headset Mic", "output": "USB Headset"}
+    assert status["mic_test_active"] is True
+    assert status["mic_test_input"] == "USB Headset Mic"
+    assert status["mic_test_output"] == "USB Headset"
+    assert stopped["ok"] is True
+    assert monitor.stopped is True

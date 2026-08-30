@@ -63,6 +63,7 @@ function setActiveView(name, force = false) {
   if (!force && state.activeView === "minutes" && name !== "minutes" && state.dirty) {
     if (!window.confirm("当前纪要尚未保存，确定离开吗？")) return;
   }
+  if (state.activeView === "record" && name !== "record") void stopMicTest(true);
   state.activeView = name;
   document.body.classList.toggle("minutes-mode", name === "minutes");
   qa("[data-view-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === name));
@@ -183,6 +184,7 @@ function renderHeaderStatus(status) {
 function renderRecorder(status) {
   const rec = status.phase === "recording";
   const busy = rec || status.phase === "processing";
+  const micTesting = Boolean(status.mic_test_active);
   $("timer").textContent = rec ? formatTime(status.elapsed) : "00:00";
   $("btnRecord").classList.toggle("recording", rec);
   $("recordButtonLabel").textContent = rec ? "停止并生成纪要" : "开始录音";
@@ -195,7 +197,21 @@ function renderRecorder(status) {
   $("consoleSource").textContent = rec ? "双轨采集中" : status.phase === "processing" ? "处理中" : "等待开始";
   $("consoleSource").previousElementSibling?.querySelector("i")?.classList.toggle("live", rec);
   $("btnRecord").disabled = status.phase === "processing";
-  ["titleInput", "attendeesRec", "micSelect", "btnRefresh"].forEach((id) => { $(id).disabled = busy; });
+  ["titleInput", "attendeesRec"].forEach((id) => { $(id).disabled = busy; });
+  ["micSelect", "btnRefresh"].forEach((id) => { $(id).disabled = busy || micTesting; });
+  $("micTestRow").classList.toggle("hidden", !status.is_windows);
+  $("btnMicTest").disabled = busy;
+  $("btnMicTest").classList.toggle("testing", micTesting);
+  $("btnMicTest").setAttribute("aria-pressed", String(micTesting));
+  $("btnMicTest").querySelector("b").textContent = micTesting ? "停止测试" : "测试麦克风";
+  const micTestStatus = $("micTestStatus");
+  micTestStatus.classList.toggle("active", micTesting);
+  micTestStatus.classList.toggle("error", Boolean(status.mic_test_error));
+  micTestStatus.textContent = micTesting
+    ? `正在回听：${status.mic_test_input || "当前麦克风"} → ${status.mic_test_output || "默认播放设备"}`
+    : status.mic_test_error
+      ? status.mic_test_error
+      : "说话声会实时送到当前默认耳机或扬声器；使用扬声器时请降低音量，避免啸叫。";
   // Windows 的会议内声固定来自默认输出设备：保持字段可见，但不让用户误以为需要选择。
   $("systemSelect").disabled = busy || Boolean(status.is_windows);
   $("btnStartImport").disabled = busy || !state.importPath;
@@ -258,9 +274,15 @@ async function loadDevices() {
     const [result, config, status] = await Promise.all([api().refresh_devices(), api().get_config(), api().get_status()]);
     const microphones = result.devices?.microphones || [];
     const sources = result.devices?.system_sources || [];
-    $("micSelect").replaceChildren(new Option("系统默认麦克风", ""));
-    microphones.forEach((name) => $("micSelect").add(new Option(name, name, false, config.microphone === name)));
     const isWindows = Boolean(status.is_windows);
+    const defaultMicrophone = result.devices?.default_microphone || "";
+    const defaultLabel = isWindows && defaultMicrophone
+      ? `跟随 Windows 默认（当前：${defaultMicrophone}）`
+      : "系统默认麦克风";
+    $("micSelect").replaceChildren(new Option(defaultLabel, "", false, !config.microphone));
+    microphones
+      .filter((name) => name !== defaultMicrophone || config.microphone === name)
+      .forEach((name) => $("micSelect").add(new Option(name, name, false, config.microphone === name)));
     $("systemSelect").replaceChildren(new Option(
       isWindows ? "系统默认输出设备（WASAPI 自动内录）" : "自动检测 BlackHole",
       "",
@@ -272,6 +294,26 @@ async function loadDevices() {
   } catch (error) {
     toast(`设备刷新失败：${error}`);
   }
+}
+
+async function stopMicTest(silent = false) {
+  if (!state.apiReady) return;
+  const result = await api().stop_mic_test();
+  if (!result.ok && !silent) toast(result.error || "无法停止麦克风测试");
+  await pollStatus();
+}
+
+async function toggleMicTest() {
+  if (!state.apiReady) return toast("桌面服务尚未就绪");
+  const status = await api().get_status();
+  if (status.mic_test_active) {
+    await stopMicTest();
+    return;
+  }
+  const result = await api().start_mic_test($("micSelect").value || "");
+  if (!result.ok) return toast(result.error || "无法测试麦克风");
+  toast("麦克风测试已开始，请说话确认回听声音");
+  await pollStatus();
 }
 
 async function startRecording() {
@@ -778,9 +820,17 @@ function bindEvents() {
   $("btnGuide").addEventListener("click", () => openOverlay("guideOverlay"));
   $("btnChangelog").addEventListener("click", () => openOverlay("changelogOverlay"));
   $("btnSettings").addEventListener("click", openSettings);
-  $("btnOutput").addEventListener("click", () => state.apiReady && api().open_output_dir());
+  $("btnOutput").addEventListener("click", async () => {
+    if (!state.apiReady) return;
+    const result = await api().open_output_dir();
+    if (!result.ok) toast(result.error || "无法打开输出目录");
+  });
   $("btnAllMinutes").addEventListener("click", () => setActiveView("minutes"));
-  $("btnRefresh").addEventListener("click", loadDevices);
+  $("btnRefresh").addEventListener("click", async () => {
+    await stopMicTest(true);
+    await loadDevices();
+  });
+  $("btnMicTest").addEventListener("click", toggleMicTest);
   $("btnRecord").addEventListener("click", toggleRecording);
   $("btnPickFile").addEventListener("click", chooseImportFile);
   $("btnStartImport").addEventListener("click", startImport);

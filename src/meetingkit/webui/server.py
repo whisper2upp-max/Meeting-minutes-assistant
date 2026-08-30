@@ -42,7 +42,9 @@ class UiState:
         self.recorder = None
         self.session_dir: Optional[Path] = None
         self.started_at: Optional[datetime] = None
-        self.devices = {"microphones": [], "system_sources": []}
+        self.devices = {"microphones": [], "system_sources": [],
+                        "default_microphone": ""}
+        self.mic_monitor = None
         self.cfg: Config = load_config()
         self.prev_output_id: Optional[int] = None  # 录音前默认输出设备（macOS 录后还原）
         self.meeting_attendees: List[str] = []     # 本场会议的参会人（会议维度，非全局）
@@ -79,6 +81,9 @@ class UiState:
             error, result = self.error, self.result
             devices = dict(self.devices)
             session = self.session_dir
+            mic_monitor = self.mic_monitor
+        mic_test_active = bool(mic_monitor and mic_monitor.active)
+        mic_test_error = mic_monitor.last_error if mic_monitor else None
         host_label = cfg.resolved_api_host()
         host_label = ("官方端点" if host_label.endswith("dashscope.aliyuncs.com")
                       else host_label.replace("https://", ""))
@@ -93,6 +98,10 @@ class UiState:
             "logs": logs, "devices": devices,
             "session_dir": str(session) if session else "",
             "is_windows": IS_WINDOWS,
+            "mic_test_active": mic_test_active,
+            "mic_test_error": mic_test_error,
+            "mic_test_input": mic_monitor.input_name if mic_monitor else "",
+            "mic_test_output": mic_monitor.output_name if mic_monitor else "",
             "loopback_ready": loopback_ready,
             "version": __version__,
             "config": {
@@ -163,10 +172,50 @@ class Api:
 
     # ---------- 录音 ----------
 
+    def start_mic_test(self, microphone: str = "") -> dict:
+        if not IS_WINDOWS:
+            return {"ok": False, "error": "麦克风实时测试目前仅在 Windows 版本提供"}
+        if _state.busy():
+            return {"ok": False, "error": "录音或处理进行中，暂时不能测试麦克风"}
+        self.stop_mic_test()
+        monitor = None
+        try:
+            monitor = audio_mod.get_mic_monitor(microphone)
+            monitor.start()
+            with _state.lock:
+                if _state.phase in ("recording", "processing"):
+                    monitor.stop()
+                    return {"ok": False, "error": "当前有任务进行中"}
+                _state.mic_monitor = monitor
+            _state.log(
+                f"麦克风测试已开始：{monitor.input_name} → {monitor.output_name}"
+            )
+            return {"ok": True, "input": monitor.input_name,
+                    "output": monitor.output_name}
+        except Exception as exc:
+            if monitor is not None:
+                monitor.stop()
+            _state.log(f"麦克风测试失败：{exc}")
+            return {"ok": False, "error": f"启动麦克风测试失败：{exc}"}
+
+    def stop_mic_test(self) -> dict:
+        with _state.lock:
+            monitor, _state.mic_monitor = _state.mic_monitor, None
+        if monitor is None:
+            return {"ok": True}
+        try:
+            monitor.stop()
+            _state.log("麦克风测试已停止")
+            return {"ok": True}
+        except Exception as exc:
+            _state.log(f"停止麦克风测试失败：{exc}")
+            return {"ok": False, "error": f"停止麦克风测试失败：{exc}"}
+
     def start_recording(self, title: str = "", system_source: str = "", microphone: str = "",
                         attendees: str = "") -> dict:
         if _state.busy():
             return {"ok": False, "error": "当前有任务进行中"}
+        self.stop_mic_test()
         if IS_MACOS:
             from ..audio import mac_setup
             if not mac_setup.blackhole_installed():
@@ -248,6 +297,7 @@ class Api:
     def process_file(self, path: str, attendees: str = "") -> dict:
         if _state.busy():
             return {"ok": False, "error": "当前有任务进行中"}
+        self.stop_mic_test()
         p = Path(path).expanduser()
         if not p.exists():
             return {"ok": False, "error": f"文件不存在：{p}"}
@@ -307,6 +357,7 @@ class Api:
     def reset(self) -> dict:
         if _state.busy():
             return {"ok": False, "error": "当前有任务进行中"}
+        self.stop_mic_test()
         _state.set(phase="idle", stage="", detail="", error=None, result=None,
                    session_dir=None, started_at=None)
         return {"ok": True}
@@ -325,13 +376,23 @@ class Api:
         return ""
 
     def open_output_dir(self) -> dict:
-        _reveal(_state.cfg.resolved_output_dir())
-        return {"ok": True}
+        try:
+            output = _state.cfg.resolved_output_dir().resolve()
+            _reveal(output)
+            _state.log(f"已打开输出目录：{output}")
+            return {"ok": True, "path": str(output)}
+        except Exception as exc:
+            _state.log(f"打开输出目录失败：{exc}")
+            return {"ok": False, "error": f"打开输出目录失败：{exc}"}
 
     def reveal(self, path: str) -> dict:
-        p = Path(path)
-        _reveal(p.parent if p.is_file() else p, select=p if p.is_file() else None)
-        return {"ok": True}
+        try:
+            p = Path(path).expanduser().resolve()
+            _reveal(p.parent if p.is_file() else p, select=p if p.is_file() else None)
+            return {"ok": True}
+        except Exception as exc:
+            _state.log(f"打开目录失败：{exc}")
+            return {"ok": False, "error": f"打开目录失败：{exc}"}
 
     def open_file(self, path: str) -> dict:
         try:
@@ -453,15 +514,23 @@ class Api:
 
 
 def _reveal(d: Path, select: Optional[Path] = None) -> None:
-    try:
-        if sys.platform == "darwin":
+    d = Path(d).expanduser()
+    if not d.exists():
+        raise FileNotFoundError(f"目录不存在：{d}")
+    if sys.platform == "darwin":
+        if select is not None:
             subprocess.Popen(["open", "-R", str(select or d)])
-        elif sys.platform == "win32":
-            subprocess.Popen(["explorer", "/select," + str(select or d)])
         else:
-            subprocess.Popen(["xdg-open", str(d)])
-    except Exception as exc:
-        _state.log(f"打开目录失败：{exc}")
+            subprocess.Popen(["open", str(d)])
+    elif sys.platform == "win32":
+        if select is not None:
+            subprocess.Popen(["explorer.exe", f"/select,{select}"])
+        else:
+            # /select,目录 会打开其父级（常见表现就是只看到 Documents）；
+            # 打开目录本身必须把目录作为普通参数传给 Explorer。
+            subprocess.Popen(["explorer.exe", str(d)])
+    else:
+        subprocess.Popen(["xdg-open", str(d)])
 
 
 def _run_autotest(api: "Api", seconds: int, audio: str) -> None:
@@ -528,14 +597,16 @@ def _run_autotest(api: "Api", seconds: int, audio: str) -> None:
 
 def _on_closing() -> bool:
     """录音/处理进行中关闭窗口时拦截确认，避免静默丢弃已录内容。"""
-    if not _state.busy():
-        return True
-    try:
-        r = _window.evaluate_js(
-            "confirm('录音或处理正在进行中，确定放弃并退出？（已录制的原始轨道会保留在会话目录）')")
-        return bool(r)
-    except Exception:
-        return True
+    allowed = True
+    if _state.busy():
+        try:
+            allowed = bool(_window.evaluate_js(
+                "confirm('录音或处理正在进行中，确定放弃并退出？（已录制的原始轨道会保留在会话目录）')"))
+        except Exception:
+            allowed = True
+    if allowed:
+        Api().stop_mic_test()
+    return allowed
 
 
 def main() -> None:

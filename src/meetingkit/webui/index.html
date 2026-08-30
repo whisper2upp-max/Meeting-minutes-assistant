@@ -29,7 +29,7 @@
       <button class="status-chip" id="statusChip" type="button">
         <span class="status-dot"></span><span id="statusText">本机就绪</span>
       </button>
-      <span class="version-chip" id="versionChip">v0.1.4</span>
+      <span class="version-chip" id="versionChip">v0.1.5</span>
       <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
         <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
       </button>
@@ -114,7 +114,7 @@
         <button class="shortcut-card release" id="btnChangelog" type="button">
           <span class="shortcut-index">04</span>
           <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
-          <strong>更新日志</strong><small>v0.1.4 · Windows 麦克风捕获修复</small><i>查看变化 →</i>
+          <strong>更新日志</strong><small>v0.1.5 · Windows 麦克风测试与目录修复</small><i>查看变化 →</i>
         </button>
       </div>
 
@@ -140,7 +140,14 @@
           <div class="field"><label for="titleInput">会议标题 <small>可选</small></label><input id="titleInput" maxlength="40" placeholder="例如：新版上线同步会"></div>
           <div class="field"><label for="attendeesRec">参会人 <small>每行一个</small></label><textarea id="attendeesRec" rows="4" placeholder="张三&#10;李四"></textarea><p>参会人会作为说话人姓名候选，不会保存到全局设置。</p></div>
           <div class="field" id="systemField"><label for="systemSelect">会议内声</label><select id="systemSelect"><option value="">正在检测系统声源…</option></select></div>
-          <div class="field"><label for="micSelect">麦克风 <button class="inline-button" id="btnRefresh" type="button">刷新设备</button></label><select id="micSelect"></select></div>
+          <div class="field">
+            <label for="micSelect">麦克风 <button class="inline-button" id="btnRefresh" type="button">刷新设备</button></label>
+            <select id="micSelect"></select>
+            <div class="mic-test-row hidden" id="micTestRow">
+              <button class="mic-test-button" id="btnMicTest" type="button" aria-pressed="false"><span></span><b>测试麦克风</b></button>
+              <p id="micTestStatus">测试时说话，声音会实时送到当前默认耳机或扬声器。</p>
+            </div>
+          </div>
           <div class="info-banner hidden" id="winHint">Windows 将自动录制默认输出设备，无需选择系统声源。</div>
           <div class="field-note" id="macNote"></div>
         </section>
@@ -295,9 +302,11 @@
 
   <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
     <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.4</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
-      <div class="release-hero"><span>0.1.4</span><div><strong>Windows 麦克风捕获修复</strong><small>2026-08-30 · Maintenance release</small></div></div>
+      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.5</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
+      <div class="release-hero"><span>0.1.5</span><div><strong>Windows 麦克风测试与目录修复</strong><small>2026-08-31 · Maintenance release</small></div></div>
       <div class="release-list">
+        <article><span>NEW</span><div><h3>实时测试当前麦克风</h3><p>说话声会低延迟回放到当前默认耳机或扬声器，并明确显示测试使用的输入与播放设备。</p></div></article>
+        <article><span>FIXED</span><div><h3>正确打开自定义输出目录</h3><p>Windows 资源管理器会直接进入设置中保存的目录，不再错误停留在 Documents 父级。</p></div></article>
         <article><span>FIXED</span><div><h3>恢复默认麦克风人声</h3><p>直接跟随 Windows WASAPI 默认输入，并按麦克风原生声道格式录制，避免误用旧端点导致静音。</p></div></article>
         <article><span>IMPROVED</span><div><h3>精简麦克风列表</h3><p>只显示真实的 WASAPI 输入设备，移除 Sound Mapper、DirectSound、输出回环和同名重复项。</p></div></article>
         <article><span>FIXED</span><div><h3>修复结束录音时闪退</h3><p>改用 PyAudio 回调采集，并按“停止音频流 → 排空写盘队列 → 关闭 WAV”的顺序安全收尾。</p></div></article>

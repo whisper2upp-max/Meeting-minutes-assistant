@@ -1,11 +1,17 @@
 import sys
+import threading
 import wave
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-from meetingkit.audio.windows_rec import WindowsRecorder, list_microphones
+from meetingkit.audio.windows_rec import (
+    WindowsMicMonitor,
+    WindowsRecorder,
+    _convert_monitor_chunk,
+    microphone_device_summary,
+)
 
 
 class _FakeStream:
@@ -141,7 +147,12 @@ def test_microphone_list_only_contains_unique_real_wasapi_inputs(monkeypatch):
     monkeypatch.setitem(sys.modules, "pyaudiowpatch", SimpleNamespace(
         PyAudio=lambda: audio, paWASAPI=13))
 
-    assert list_microphones() == ["Microphone Array", "USB Headset"]
+    summary = microphone_device_summary()
+
+    assert summary == {
+        "microphones": ["Microphone Array", "USB Headset"],
+        "default_microphone": "Microphone Array",
+    }
     assert audio.events == ["audio.terminate"]
 
 
@@ -200,3 +211,95 @@ def test_missing_named_mic_reports_actionable_error(tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError, match="设备可能已拔出"):
         recorder._open_mic(tmp_path)
+
+
+def test_monitor_pcm_downmixes_resamples_and_duplicates_output_channels():
+    stereo = np.array([[1000, 3000], [3000, 5000]], dtype=np.int16)
+
+    converted = _convert_monitor_chunk(
+        stereo.tobytes(), input_channels=2, input_rate=24000,
+        output_channels=2, output_rate=48000,
+    )
+    output = np.frombuffer(converted, dtype=np.int16).reshape(-1, 2)
+
+    assert output.shape == (4, 2)
+    assert output[:, 0].tolist() == [2000, 3000, 4000, 4000]
+    assert output[:, 1].tolist() == output[:, 0].tolist()
+
+
+class _MonitorStream(_FakeStream):
+    def __init__(self, events, written=None, wrote=None):
+        super().__init__(events)
+        self.written = written
+        self.wrote = wrote
+
+    def write(self, data, exception_on_underflow=True):
+        self.events.append("stream.write")
+        self.written.append(data)
+        self.wrote.set()
+
+
+class _MonitorAudio:
+    def __init__(self):
+        self.events = []
+        self.open_calls = []
+        self.callbacks = []
+        self.written = []
+        self.wrote = threading.Event()
+        self.devices = [
+            {"name": "Laptop Microphone", "index": 5, "hostApi": 2,
+             "defaultSampleRate": 24000, "maxInputChannels": 2},
+        ]
+        self.output = {
+            "name": "USB Headphones", "index": 12, "hostApi": 2,
+            "defaultSampleRate": 48000, "maxOutputChannels": 2,
+        }
+
+    def get_host_api_info_by_type(self, host_type):
+        assert host_type == 13
+        return {"index": 2, "defaultInputDevice": 5, "defaultOutputDevice": 12}
+
+    def get_device_info_generator(self):
+        return iter(self.devices)
+
+    def get_device_info_by_index(self, index):
+        assert index == 12
+        return self.output
+
+    def open(self, **kwargs):
+        self.open_calls.append(kwargs)
+        if kwargs.get("output"):
+            return _MonitorStream(self.events, self.written, self.wrote)
+        self.callbacks.append(kwargs["stream_callback"])
+        return _FakeStream(self.events)
+
+    def terminate(self):
+        self.events.append("audio.terminate")
+
+
+def test_mic_monitor_routes_selected_input_to_current_default_output(monkeypatch):
+    audio = _MonitorAudio()
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch", SimpleNamespace(
+        PyAudio=lambda: audio, paWASAPI=13, paInt16=8,
+        paContinue=0, paComplete=1,
+    ))
+    monitor = WindowsMicMonitor()
+
+    monitor.start()
+    samples = np.array([[1000, 3000], [3000, 5000]], dtype=np.int16)
+    assert audio.callbacks[0](samples.tobytes(), 2, {}, 0)[1] == 0
+    assert audio.wrote.wait(timeout=1)
+
+    assert monitor.active is True
+    assert monitor.input_name == "Laptop Microphone"
+    assert monitor.output_name == "USB Headphones"
+    assert audio.open_calls[0] == {
+        "format": 8, "channels": 2, "rate": 48000, "output": True,
+        "output_device_index": 12, "frames_per_buffer": 1024,
+    }
+    assert audio.open_calls[1]["input_device_index"] == 5
+    assert np.frombuffer(audio.written[0], dtype=np.int16).reshape(-1, 2)[:, 0].tolist() == [2000, 3000, 4000, 4000]
+
+    monitor.stop()
+    assert monitor.active is False
+    assert audio.events[-3:] == ["stream.stop", "stream.close", "audio.terminate"]

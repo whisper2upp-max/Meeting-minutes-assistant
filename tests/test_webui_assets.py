@@ -21,7 +21,7 @@ def test_home_contains_guide_changelog_and_version():
 
     assert 'id="guideOverlay"' in html
     assert 'id="changelogOverlay"' in html
-    assert "v0.1.4" in html
+    assert "v0.1.5" in html
     assert 'data-view-panel="minutes"' in html
 
 
@@ -66,6 +66,17 @@ def test_windows_system_audio_is_visible_and_automatic():
     assert 'classList.toggle("hidden", Boolean(status.is_windows))' not in javascript
 
 
+def test_windows_microphone_test_and_default_device_label_are_wired():
+    html = (WEBUI / "index.html").read_text(encoding="utf-8")
+    javascript = (WEBUI / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="btnMicTest"' in html
+    assert 'id="micTestStatus"' in html
+    assert "start_mic_test" in javascript
+    assert "stop_mic_test" in javascript
+    assert "跟随 Windows 默认（当前：" in javascript
+
+
 def test_packaging_includes_all_webui_assets():
     packaging_files = [
         ROOT / "scripts" / "build_macos.sh",
@@ -98,12 +109,12 @@ def test_release_builds_embed_version_metadata():
     assert '--version-file assets\\version_info.txt' in workflow
     assert '--version-file assets\\version_info.txt' in windows_script
     for content in (workflow, macos_script):
-        assert "Set :CFBundleShortVersionString 0.1.4" in content
-        assert "Set :CFBundleVersion 0.1.4" in content
-    assert "filevers=(0, 1, 4, 0)" in windows_version
-    assert "prodvers=(0, 1, 4, 0)" in windows_version
-    assert "StringStruct('FileVersion', '0.1.4')" in windows_version
-    assert "StringStruct('ProductVersion', '0.1.4')" in windows_version
+        assert "Set :CFBundleShortVersionString 0.1.5" in content
+        assert "Set :CFBundleVersion 0.1.5" in content
+    assert "filevers=(0, 1, 5, 0)" in windows_version
+    assert "prodvers=(0, 1, 5, 0)" in windows_version
+    assert "StringStruct('FileVersion', '0.1.5')" in windows_version
+    assert "StringStruct('ProductVersion', '0.1.5')" in windows_version
 
 
 def test_windows_release_uses_native_certificate_store():
