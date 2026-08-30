@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -16,6 +17,7 @@ from typing import List, Optional
 
 import webview
 
+from .. import __version__
 from .. import audio as audio_mod
 from .. import pipeline as pipeline_mod
 from ..config import Config, load_config, save_config
@@ -92,6 +94,7 @@ class UiState:
             "session_dir": str(session) if session else "",
             "is_windows": IS_WINDOWS,
             "loopback_ready": loopback_ready,
+            "version": __version__,
             "config": {
                 "has_key": bool(cfg.effective_api_key()),
                 "host_label": host_label,
@@ -352,8 +355,15 @@ class Api:
     def get_minutes(self, path: str) -> dict:
         try:
             p = self._safe_minutes_path(path)
-            return {"ok": True, "content": p.read_text(encoding="utf-8"),
-                    "session": str(p.parent)}
+            transcript = p.parent / pipeline_mod.TRANSCRIPT_MD
+            return {
+                "ok": True,
+                "content": p.read_text(encoding="utf-8"),
+                "session": str(p.parent),
+                "session_name": p.parent.name,
+                "transcript": str(transcript) if transcript.exists() else "",
+                "mtime": datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M"),
+            }
         except Exception as exc:
             return {"ok": False, "error": f"{exc}"}
 
@@ -378,10 +388,40 @@ class Api:
             if dest.exists():
                 stamp = datetime.now().strftime("%H%M%S")
                 dest = dest_dir / f"{src.stem}_{stamp}{src.suffix}"
-            import shutil
             shutil.copy2(src, dest)
             _state.log(f"纪要已导出：{dest}")
             return {"ok": True, "dest": str(dest)}
+        except Exception as exc:
+            return {"ok": False, "error": f"{exc}"}
+
+    def delete_session(self, path: str) -> dict:
+        """永久删除一场会议的完整目录；只允许删除输出根目录的直接子目录。"""
+        try:
+            if _state.busy():
+                return {"ok": False, "error": "录音或处理进行中，暂时不能删除会议"}
+            minutes = self._safe_minutes_path(path)
+            root = _state.cfg.resolved_output_dir().resolve()
+            session = minutes.parent.resolve()
+            if minutes.name != pipeline_mod.MINUTES_MD:
+                raise RuntimeError("只能通过会议纪要文件删除会议")
+            if session == root or session.parent != root:
+                raise RuntimeError("只能删除输出目录内的单个会议文件夹")
+            if not minutes.is_file() or not session.is_dir():
+                raise RuntimeError("会议记录不存在或已被移除")
+
+            shutil.rmtree(session)
+            with _state.lock:
+                active_session = _state.session_dir.resolve() if _state.session_dir else None
+                if active_session == session:
+                    _state.phase = "idle"
+                    _state.stage = ""
+                    _state.detail = ""
+                    _state.error = None
+                    _state.result = None
+                    _state.session_dir = None
+                    _state.started_at = None
+            _state.log(f"已永久删除会议文件夹：{session.name}")
+            return {"ok": True, "deleted": str(session)}
         except Exception as exc:
             return {"ok": False, "error": f"{exc}"}
 
@@ -397,14 +437,17 @@ class Api:
                 if not m.exists():
                     continue
                 st = m.stat()
+                transcript = d / pipeline_mod.TRANSCRIPT_MD
                 out.append({"name": d.name,
                             "minutes": str(m),
+                            "transcript": str(transcript) if transcript.exists() else "",
                             "mtime": datetime.fromtimestamp(st.st_mtime).strftime("%m-%d %H:%M"),
-                            "size_kb": st.st_size // 1024})
-            out.sort(key=lambda x: x["name"], reverse=True)
+                            "mtime_ts": st.st_mtime,
+                            "size_kb": max(1, st.st_size // 1024)})
+            out.sort(key=lambda x: x["mtime_ts"], reverse=True)
         except Exception:
             pass
-        return {"ok": True, "sessions": out[:8]}
+        return {"ok": True, "sessions": out}
 
 
 def _reveal(d: Path, select: Optional[Path] = None) -> None:
@@ -502,9 +545,9 @@ def main() -> None:
             "会议纪要助手",
             url=str(_INDEX_HTML),
             js_api=api,
-            width=1100, height=780,
-            min_size=(960, 680),
-            background_color="#f4f5f7",
+            width=1280, height=840,
+            min_size=(1040, 720),
+            background_color="#f3f6fc",
         )
         autotest = os.environ.get("MEETINGKIT_AUTOTEST")
         if not autotest and Path("/tmp/mk_autotest").exists():

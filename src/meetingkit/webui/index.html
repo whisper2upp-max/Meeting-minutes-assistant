@@ -1,900 +1,333 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<title>会议纪要助手</title>
-<style>
-:root{
-  --bg:#f4f5f7; --card:#fff; --line:#e7e9ee; --line2:#d8dbe3;
-  --ink:#1a1d26; --ink2:#5b616e; --ink3:#9aa0ac;
-  --accent:#4f46e5; --accent-weak:#eef0fe;
-  --red:#e5484d; --red-deep:#d9383e;
-  --green:#12b76a; --green-weak:#e8f8f0;
-  --amber:#f79009;
-  --r-lg:18px; --r-md:12px; --r-sm:9px;
-  --shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px -12px rgba(16,24,40,.12);
-  --mono:"SF Mono",Menlo,Consolas,"Courier New",monospace;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
-  background:
-    radial-gradient(1200px 500px at 85% -10%,rgba(79,70,229,.07),transparent 60%),
-    radial-gradient(900px 420px at -10% 110%,rgba(18,183,106,.06),transparent 55%),
-    var(--bg);
-  color:var(--ink); font-size:14px; line-height:1.55;
-  display:flex; flex-direction:column; min-height:100vh;
-  -webkit-font-smoothing:antialiased; user-select:none;
-}
-svg{display:block}
-
-/* ---------- 顶栏 ---------- */
-.topbar{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:14px 28px; border-bottom:1px solid rgba(231,233,238,.9);
-  background:rgba(255,255,255,.72); backdrop-filter:blur(10px);
-  position:sticky; top:0; z-index:10;
-}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:.2px}
-.brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#4f46e5 60%,#4338ca);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px -2px rgba(79,70,229,.45)}
-.brand-sub{font-weight:500;font-size:12px;color:var(--ink3);margin-left:2px;padding-top:2px}
-.top-right{display:flex;align-items:center;gap:12px}
-.pill{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;padding:5px 13px;border-radius:99px;border:1px solid var(--line2);background:#fff;color:var(--ink2)}
-.pill .dot{width:7px;height:7px;border-radius:99px;background:var(--ink3)}
-.pill.rec{color:var(--red-deep);border-color:#f3c1c3;background:#fef3f3}.pill.rec .dot{background:var(--red);animation:blink 1.1s ease-in-out infinite}
-.pill.proc{color:var(--accent);border-color:#c9cdf8;background:var(--accent-weak)}.pill.proc .dot{background:var(--accent);animation:blink 1.1s ease-in-out infinite}
-.pill.done{color:#087443;border-color:#bfe8d2;background:var(--green-weak)}.pill.done .dot{background:var(--green)}
-.pill.err{color:var(--red-deep);border-color:#f3c1c3;background:#fef3f3}.pill.err .dot{background:var(--red)}
-@keyframes blink{50%{opacity:.25}}
-.icon-btn{width:34px;height:34px;border-radius:10px;border:1px solid var(--line2);background:#fff;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
-.icon-btn:hover{color:var(--accent);border-color:#c9cdf8;background:var(--accent-weak)}
-
-/* ---------- 主体与视图 ---------- */
-main{flex:1;width:100%;max-width:1080px;margin:0 auto;padding:26px 24px 12px}
-.view{animation:rise .22s ease}
-.hidden{display:none!important}
-@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
-.view-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
-.view-title{font-size:19px;font-weight:700}
-.back-btn{display:inline-flex;align-items:center;gap:6px;color:var(--ink2);border:1px solid var(--line2);background:#fff;border-radius:var(--r-sm);padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
-.back-btn:hover{color:var(--accent);border-color:#c9cdf8;background:var(--accent-weak)}
-
-/* ---------- 首页 ---------- */
-.home-cards{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
-.home-card{
-  background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
-  box-shadow:var(--shadow);padding:34px 30px 30px;cursor:pointer;text-align:left;
-  font-family:inherit;transition:.18s;position:relative;overflow:hidden;
-}
-.home-card:hover{transform:translateY(-3px);box-shadow:0 4px 8px rgba(16,24,40,.05),0 18px 40px -12px rgba(16,24,40,.2);border-color:#c9cdf8}
-.home-card .hc-icon{width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;margin-bottom:18px}
-.hc-icon.rec{background:linear-gradient(135deg,#ff7a7f,#e5484d);box-shadow:0 8px 18px -6px rgba(229,72,77,.5)}
-.hc-icon.imp{background:linear-gradient(135deg,#818cf8,#4f46e5);box-shadow:0 8px 18px -6px rgba(79,70,229,.45)}
-.home-card h2{font-size:19px;font-weight:700;margin-bottom:7px}
-.home-card p{font-size:13px;color:var(--ink2)}
-.home-card .hc-arrow{position:absolute;right:24px;top:38px;color:var(--ink3)}
-@media(max-width:760px){.home-cards{grid-template-columns:1fr}}
-
-.recent-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:20px 22px}
-.sec-title{font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:12px;display:flex;align-items:center;gap:7px}
-.recent-item{display:flex;align-items:center;gap:12px;padding:10px 4px;border-top:1px solid var(--line)}
-.recent-item:first-of-type{border-top:none}
-.recent-name{flex:1;font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.recent-time{font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums}
-.recent-open{color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;border:none;background:none;font-family:inherit}
-.recent-open:hover{text-decoration:underline}
-.empty-tip{color:var(--ink3);font-size:13px;padding:8px 4px}
-
-/* ---------- 表单 ---------- */
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow)}
-.field{margin-bottom:14px}
-.field label{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:600;color:var(--ink2);margin-bottom:6px}
-.field input,.field select,.form input,.form select,.form textarea,.field textarea{
-  width:100%;padding:9px 12px;border:1px solid var(--line2);border-radius:var(--r-sm);
-  font-size:13.5px;color:var(--ink);background:#fff;outline:none;transition:.15s;font-family:inherit;
-}
-.field textarea{resize:vertical;min-height:56px}
-.field input:focus,.field select:focus,.field textarea:focus,.form input:focus,.form select:focus,.form textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,70,229,.13)}
-.link{color:var(--accent);cursor:pointer;font-weight:600;font-size:12px;text-decoration:none}
-.link:hover{text-decoration:underline}
-.win-hint{display:flex;gap:8px;align-items:flex-start;background:var(--accent-weak);border:1px solid #dfe2fc;color:#3f37b8;border-radius:var(--r-sm);padding:9px 12px;font-size:12.5px;margin-bottom:14px}
-.macos-note{font-size:12px;color:var(--ink3);margin:-6px 0 12px}
-
-.two-col{display:grid;grid-template-columns:5fr 7fr;gap:20px;align-items:start}
-@media(max-width:880px){.two-col{grid-template-columns:1fr}}
-
-/* ---------- 录音按钮 ---------- */
-.record-area{display:flex;flex-direction:column;align-items:center;padding:14px 0 4px}
-.record-btn{
-  width:100px;height:100px;border-radius:99px;border:none;cursor:pointer;position:relative;
-  background:radial-gradient(circle at 32% 28%,#f26d71,var(--red) 55%,var(--red-deep));
-  box-shadow:0 10px 24px -6px rgba(229,72,77,.55),inset 0 1px 1px rgba(255,255,255,.35);
-  display:flex;align-items:center;justify-content:center;color:#fff;transition:transform .15s;
-}
-.record-btn:hover{transform:scale(1.04)}
-.record-btn:active{transform:scale(.97)}
-.record-btn:disabled{background:#cfd3dc;box-shadow:none;cursor:not-allowed;transform:none}
-.record-btn .glyph-stop{display:none}
-.record-btn.rec{animation:breath 2.2s ease-in-out infinite}
-.record-btn.rec .glyph-mic{display:none}
-.record-btn.rec .glyph-stop{display:block}
-@keyframes breath{0%,100%{box-shadow:0 10px 24px -6px rgba(229,72,77,.55),0 0 0 0 rgba(229,72,77,.35)}50%{box-shadow:0 10px 24px -6px rgba(229,72,77,.55),0 0 0 16px rgba(229,72,77,0)}}
-.timer{margin-top:13px;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px}
-.timer.dim{color:var(--ink3)}
-.rec-hint{margin-top:2px;font-size:12.5px;color:var(--ink3);text-align:center}
-
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:var(--r-sm);font-size:13.5px;font-weight:600;padding:9px 16px;cursor:pointer;transition:.15s;border:1px solid transparent;font-family:inherit}
-.btn.primary{background:var(--accent);color:#fff}
-.btn.primary:hover{background:#4338ca}
-.btn.ghost{background:#fff;color:var(--ink2);border-color:var(--line2)}
-.btn.ghost:hover{color:var(--accent);border-color:#c9cdf8;background:var(--accent-weak)}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.btn.full{width:100%}
-.btn.lg{padding:12px 22px;font-size:14.5px}
-
-/* ---------- 友好进度 ---------- */
-.progress-card{padding:26px 28px 20px}
-.phero{display:flex;align-items:center;gap:16px;margin-bottom:16px}
-.picon{width:50px;height:50px;border-radius:99px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--accent-weak);color:var(--accent)}
-.picon.spin{animation:spin 1.6s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.picon.ok{background:var(--green);color:#fff}
-.picon.bad{background:var(--red);color:#fff}
-.ptext{font-size:19px;font-weight:700}
-.psub{font-size:13px;color:var(--ink3);margin-top:2px;word-break:break-all}
-.err-box{background:#fef3f3;border:1px solid #f3c1c3;border-radius:var(--r-md);padding:13px 15px;font-size:13.5px;color:#8a3136;margin-bottom:12px;user-select:text;white-space:pre-wrap}
-
-.steps{display:flex;margin:4px 0 14px}
-.step{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;gap:6px}
-.step:not(:first-child)::before{content:"";position:absolute;top:10px;right:calc(50% + 26px);left:calc(-50% + 26px);height:2px;background:var(--line2);border-radius:2px}
-.step:not(:first-child).done::before,.step:not(:first-child).active::before{background:var(--green)}
-.step .dot{width:22px;height:22px;border-radius:99px;background:#fff;border:2px solid var(--line2);display:flex;align-items:center;justify-content:center;color:transparent;z-index:1}
-.step .name{font-size:11.5px;font-weight:700;color:var(--ink3)}
-.step.active .dot{border-color:var(--accent);background:var(--accent-weak);animation:pulse 1.4s ease-in-out infinite}
-.step.active .name{color:var(--accent)}
-.step.active:not(:first-child)::before{background:linear-gradient(90deg,var(--green),var(--accent))}
-.step.done .dot{border-color:var(--green);background:var(--green);color:#fff}
-.step.done .name{color:var(--ink2)}
-.step.err .dot{border-color:var(--red);background:var(--red)}
-.step.err .name{color:var(--red-deep)}
-@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(79,70,229,.09)}}
-
-.log-toggle{display:inline-flex;align-items:center;gap:6px;color:var(--ink3);font-size:12.5px;font-weight:600;cursor:pointer;border:none;background:none;font-family:inherit;padding:4px 0}
-.log-toggle:hover{color:var(--accent)}
-.log{background:#101423;border-radius:var(--r-md);padding:12px 14px;font-family:var(--mono);font-size:11.8px;line-height:1.75;color:#c6cde0;overflow-y:auto;max-height:240px;margin-top:8px;user-select:text}
-.log .ts{color:#5a6480;margin-right:8px}
-.log .warn{color:#f7c948}
-.log .errline{color:#ff8a8e}
-
-/* ---------- 纪要视图 ---------- */
-.minutes-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
-.minutes-path{font-family:var(--mono);font-size:11.5px;color:var(--ink3);word-break:break-all;flex:1;min-width:200px}
-.minutes-tools{display:flex;gap:8px;margin-left:auto}
-.minutes-body-card{padding:30px 36px;min-height:300px}
-.md-body{font-size:14.5px;line-height:1.85;color:var(--ink);user-select:text}
-.md-body h2{font-size:19px;margin:22px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--accent-weak)}
-.md-body h2:first-child{margin-top:0}
-.md-body h3{font-size:16px;margin:18px 0 8px;color:var(--ink)}
-.md-body p{margin:8px 0}
-.md-body ul{margin:8px 0 8px 22px}
-.md-body li{margin:4px 0}
-.md-body b{color:var(--ink)}
-.md-body table{border-collapse:collapse;margin:12px 0;width:100%}
-.md-body td,.md-body th{border:1px solid var(--line2);padding:8px 12px;font-size:13.5px;text-align:left}
-.md-body tr:nth-child(odd) td{background:#fafbfd}
-/* 所见即所得编辑态 */
-.md-body[contenteditable="true"]{outline:2px dashed var(--accent);outline-offset:10px;border-radius:6px;cursor:text}
-.md-body[contenteditable="true"] td{min-width:80px}
-.edit-hint{font-size:12px;color:var(--accent);margin:0 0 8px 2px;display:flex;align-items:center;gap:6px}
-
-/* ---------- 弹窗 / toast ---------- */
-.overlay{position:fixed;inset:0;background:rgba(16,20,33,.42);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;animation:fade .18s ease}
-@keyframes fade{from{opacity:0}}
-.modal{width:560px;max-width:calc(100vw - 40px);max-height:calc(100vh - 60px);overflow-y:auto;padding:24px;animation:rise .22s ease}
-.modal-title{font-size:16.5px;font-weight:700;margin-bottom:4px}
-.modal-sub{font-size:12.5px;color:var(--ink3);margin-bottom:16px}
-.form .sec{font-size:12px;font-weight:700;color:var(--accent);margin:16px 0 8px;letter-spacing:.4px}
-.form .row{display:flex;gap:8px;align-items:center}
-.form .hint{font-size:11.5px;color:var(--ink3);margin-top:4px}
-.form .pw{position:relative}
-.form .pw input{padding-right:40px}
-.form .pw .eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--ink3);cursor:pointer;padding:4px}
-.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
-.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1a1d26;color:#fff;font-size:13px;padding:10px 18px;border-radius:99px;box-shadow:0 10px 30px -8px rgba(0,0,0,.4);z-index:99;animation:rise .2s ease;max-width:80vw}
-
-/* 导入视图 */
-.import-drop{
-  border:2px dashed var(--line2);border-radius:var(--r-lg);padding:34px 20px;text-align:center;
-  color:var(--ink2);cursor:pointer;transition:.15s;background:#fbfcfe;
-}
-.import-drop:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-weak)}
-.import-file{margin-top:10px;font-size:13px;color:var(--ink2);font-family:var(--mono);word-break:break-all;user-select:text}
-
-::-webkit-scrollbar{width:9px;height:9px}
-::-webkit-scrollbar-thumb{background:#cdd2dd;border-radius:9px;border:2px solid transparent;background-clip:content-box}
-.log::-webkit-scrollbar-thumb{background:#2c3350;border:2px solid transparent;background-clip:content-box}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>会议纪要助手</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-<header class="topbar">
-  <div class="brand">
-    <div class="logo">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
-    </div>
-    会议纪要助手
-    <span class="brand-sub">录音 · 转写 · 纪要</span>
-  </div>
-  <div class="top-right">
-    <span class="pill" id="statusPill"><span class="dot"></span><span id="statusText">就绪</span></span>
-    <button class="icon-btn" id="btnSettings" title="设置">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </button>
-  </div>
-</header>
-
-<main>
-
-<!-- ================= 首页 ================= -->
-<section class="view" id="viewHome">
-  <div class="home-cards">
-    <button class="home-card" id="cardRecord">
-      <div class="hc-icon rec">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
-      </div>
-      <h2>会议录制</h2>
-      <p>开会时边录边转，结束自动生成纪要</p>
-      <span class="hc-arrow">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+  <header class="app-header">
+    <a class="brand" href="#" data-view="home" aria-label="会议纪要助手首页">
+      <span class="brand-mark" aria-hidden="true">
+        <i></i><i></i><i></i><i></i>
       </span>
-    </button>
-    <button class="home-card" id="cardImport">
-      <div class="hc-icon imp">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-      </div>
-      <h2>会议纪要生成</h2>
-      <p>导入已有的音频 / 视频文件，直接转成纪要</p>
-      <span class="hc-arrow">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      <span class="brand-copy">
+        <strong>会议纪要助手</strong>
+        <small>MEETING WORKSPACE</small>
       </span>
-    </button>
-  </div>
+    </a>
 
-  <div class="recent-card">
-    <div class="sec-title">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      最近的会议
+    <nav class="main-nav" aria-label="主导航">
+      <button class="nav-item active" data-view="home">工作台</button>
+      <button class="nav-item" data-view="record">会议录制</button>
+      <button class="nav-item" data-view="import">导入生成</button>
+      <button class="nav-item" data-view="minutes">纪要编辑</button>
+    </nav>
+
+    <div class="header-actions">
+      <button class="status-chip" id="statusChip" type="button">
+        <span class="status-dot"></span><span id="statusText">本机就绪</span>
+      </button>
+      <span class="version-chip" id="versionChip">v0.1.0</span>
+      <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
+        <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
+      </button>
+      <button class="icon-button" id="btnSettings" type="button" title="设置" aria-label="打开设置">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 1 1 4.4 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1A2 2 0 1 1 19.6 7l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.3a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
     </div>
-    <div id="recentList"><div class="empty-tip">还没有生成过纪要</div></div>
-  </div>
-</section>
+  </header>
 
-<!-- ================= 会议录制 ================= -->
-<section class="view hidden" id="viewRecord">
-  <div class="view-head">
-    <button class="back-btn" id="backFromRecord">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      首页
-    </button>
-    <span class="view-title">会议录制</span>
-  </div>
-  <div class="two-col">
-    <div class="card" style="padding:22px">
-      <div class="field">
-        <label>会议标题（可选）</label>
-        <input id="titleInput" placeholder="例如：新版上线同步会" maxlength="40">
-      </div>
-      <div class="field">
-        <label>参会人（可选，每行一个，用于把说话人映射为姓名）</label>
-        <textarea id="attendeesRec" placeholder="张三&#10;李四"></textarea>
-      </div>
-      <div class="field" id="systemField">
-        <label>系统声音（会议内录）</label>
-        <select id="systemSelect"></select>
-      </div>
-      <div class="win-hint hidden" id="winHint">
-        <span>系统声音：默认输出设备（自动内录，无需选择）</span>
-      </div>
-      <div class="field">
-        <label><span>麦克风（录你的声音）</span><a class="link" id="btnRefresh">刷新设备</a></label>
-        <select id="micSelect"></select>
-      </div>
-      <div class="macos-note" id="macNote"></div>
+  <main class="app-shell">
+    <section class="view active" id="viewHome" data-view-panel="home">
+      <div class="hero-card">
+        <div class="hero-copy">
+          <div class="eyebrow"><span></span> LOCAL-FIRST MEETING INTELLIGENCE</div>
+          <h1>把每场会议，<br><em>变成清晰的下一步。</em></h1>
+          <p>同时录下会议内声与麦克风，自动完成说话人分离、全文转写和结构化纪要。音频留在本机，工作流一气呵成。</p>
+          <div class="hero-actions">
+            <button class="button primary" type="button" data-view="record">
+              <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>
+              开始一场会议
+            </button>
+            <button class="button secondary" type="button" data-view="import">导入已有录音</button>
+          </div>
+          <div class="hero-metrics">
+            <div><strong id="metricMeetings">0</strong><span>已生成纪要</span></div>
+            <div><strong id="metricTranscribe">fun-asr</strong><span>转写模型</span></div>
+            <div><strong id="metricMinutes">qwen-flash</strong><span>纪要模型</span></div>
+          </div>
+        </div>
 
-      <div class="record-area">
-        <button class="record-btn" id="btnRecord" title="开始录音">
-          <svg class="glyph-mic" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
-          <svg class="glyph-stop" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
+        <div class="flow-map" aria-label="会议处理流程">
+          <div class="flow-map-head">
+            <span><i></i> 工作流在线</span>
+            <small>4 STAGES</small>
+          </div>
+          <div class="flow-track">
+            <div class="flow-node hot">
+              <b>01</b><span class="flow-icon red"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/></svg></span>
+              <div><strong>录制 / 导入</strong><small>内声 + 麦克风</small></div>
+            </div>
+            <div class="flow-connector"><span></span></div>
+            <div class="flow-node">
+              <b>02</b><span class="flow-icon"><svg viewBox="0 0 24 24"><path d="M4 14.5V20h16v-5.5M8 9l4-4 4 4M12 5v11"/></svg></span>
+              <div><strong>百炼上传</strong><small>临时云端存储</small></div>
+            </div>
+            <div class="flow-connector"><span></span></div>
+            <div class="flow-node">
+              <b>03</b><span class="flow-icon cyan"><svg viewBox="0 0 24 24"><path d="M3 12h3l2-5 4 10 3-8 2 3h4"/></svg></span>
+              <div><strong>智能转写</strong><small>说话人自动分离</small></div>
+            </div>
+            <div class="flow-connector"><span></span></div>
+            <div class="flow-node">
+              <b>04</b><span class="flow-icon violet"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg></span>
+              <div><strong>纪要生成</strong><small>可编辑 Markdown</small></div>
+            </div>
+          </div>
+          <div class="flow-map-foot"><span>音频和纪要保存在你的电脑</span><b>LOCAL OUTPUT</b></div>
+        </div>
+      </div>
+
+      <div class="section-heading">
+        <div><span class="eyebrow simple">START HERE</span><h2>会议工作台</h2></div>
+        <p>从实时会议开始，或继续整理历史纪要。</p>
+      </div>
+
+      <div class="shortcut-grid">
+        <button class="shortcut-card record" type="button" data-view="record">
+          <span class="shortcut-index">01</span>
+          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg></span>
+          <strong>会议录制</strong><small>实时捕捉内声与发言</small><i>开始录音 →</i>
         </button>
-        <div class="timer dim" id="timer">00:00</div>
-        <div class="rec-hint" id="recHint">点击开始 · 内录 + 麦克风，结束后自动生成纪要</div>
+        <button class="shortcut-card import" type="button" data-view="import">
+          <span class="shortcut-index">02</span>
+          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 14v6h16v-6M8 9l4-4 4 4M12 5v11"/></svg></span>
+          <strong>导入生成</strong><small>处理现有音频或视频</small><i>选择文件 →</i>
+        </button>
+        <button class="shortcut-card guide" id="btnGuide" type="button">
+          <span class="shortcut-index">03</span>
+          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h7a3 3 0 0 1 3 3v13a3 3 0 0 0-3-3H4z"/><path d="M20 4h-3a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h3z"/></svg></span>
+          <strong>使用说明</strong><small>首次配置与完整流程</small><i>阅读指南 →</i>
+        </button>
+        <button class="shortcut-card release" id="btnChangelog" type="button">
+          <span class="shortcut-index">04</span>
+          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
+          <strong>更新日志</strong><small>v0.1.0 · 首个可用版本</small><i>查看变化 →</i>
+        </button>
       </div>
-    </div>
-    <div id="progressMountRecord"></div>
-  </div>
-</section>
 
-<!-- ================= 会议纪要生成（导入） ================= -->
-<section class="view hidden" id="viewImport">
-  <div class="view-head">
-    <button class="back-btn" id="backFromImport">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      首页
-    </button>
-    <span class="view-title">会议纪要生成</span>
-  </div>
-  <div class="two-col">
-    <div class="card" style="padding:22px">
-      <div class="field">
-        <label>参会人（可选，每行一个，用于把说话人映射为姓名）</label>
-        <textarea id="attendeesImp" placeholder="张三&#10;李四"></textarea>
+      <section class="recent-panel">
+        <div class="panel-head">
+          <div><span class="eyebrow simple">RECENT</span><h2>最近的会议</h2></div>
+          <button class="text-button" id="btnAllMinutes" type="button">进入纪要工作区 →</button>
+        </div>
+        <div class="recent-list" id="recentList">
+          <div class="empty-state"><span>还没有会议纪要</span><small>完成一次录制或导入后，会在这里出现。</small></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="view" id="viewRecord" data-view-panel="record">
+      <div class="page-title-row">
+        <div><span class="eyebrow simple">LIVE CAPTURE</span><h1>会议录制</h1><p>先确认会议信息与设备，然后开始双轨录音。</p></div>
+        <button class="button secondary" type="button" data-view="home">返回工作台</button>
       </div>
-      <div class="import-drop" id="btnPickFile">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 10px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        点击选择音频 / 视频文件
-        <div style="font-size:12px;color:var(--ink3);margin-top:6px">支持 wav / mp3 / m4a / flac / mp4 等常见格式</div>
+      <div class="capture-layout">
+        <section class="surface setup-card">
+          <div class="surface-title"><span>01</span><div><h2>会议设置</h2><p>用于命名输出与识别参会人</p></div></div>
+          <div class="field"><label for="titleInput">会议标题 <small>可选</small></label><input id="titleInput" maxlength="40" placeholder="例如：新版上线同步会"></div>
+          <div class="field"><label for="attendeesRec">参会人 <small>每行一个</small></label><textarea id="attendeesRec" rows="4" placeholder="张三&#10;李四"></textarea><p>参会人会作为说话人姓名候选，不会保存到全局设置。</p></div>
+          <div class="field" id="systemField"><label for="systemSelect">会议内声</label><select id="systemSelect"></select></div>
+          <div class="field"><label for="micSelect">麦克风 <button class="inline-button" id="btnRefresh" type="button">刷新设备</button></label><select id="micSelect"></select></div>
+          <div class="info-banner hidden" id="winHint">Windows 将自动录制默认输出设备，无需选择系统声源。</div>
+          <div class="field-note" id="macNote"></div>
+        </section>
+
+        <div class="capture-stack">
+          <div id="progressMountRecord"></div>
+          <section class="capture-console">
+            <div class="console-head"><span><i></i> CAPTURE CONSOLE</span><small id="consoleSource">等待开始</small></div>
+            <div class="waveform" id="waveform" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="capture-timer" id="timer">00:00</div>
+            <p id="recHint">准备就绪后点击按钮，会议内声和麦克风将同步录制。</p>
+            <button class="record-button" id="btnRecord" type="button">
+              <span><svg class="icon-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg><svg class="icon-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span>
+              <b id="recordButtonLabel">开始录音</b>
+            </button>
+            <div class="console-meta"><span><i class="red"></i> 本机音频</span><span><i class="cyan"></i> 双轨捕捉</span><span><i class="violet"></i> 自动处理</span></div>
+          </section>
+        </div>
       </div>
-      <div class="import-file" id="importFileName"></div>
-      <div style="margin-top:14px">
-        <button class="btn primary full lg" id="btnStartImport" disabled>开始生成纪要</button>
+    </section>
+
+    <section class="view" id="viewImport" data-view-panel="import">
+      <div class="page-title-row">
+        <div><span class="eyebrow simple">FILE TO MINUTES</span><h1>导入生成纪要</h1><p>选择已有音频或视频，自动完成转写与纪要。</p></div>
+        <button class="button secondary" type="button" data-view="home">返回工作台</button>
       </div>
-    </div>
-    <div id="progressMountImport"></div>
-  </div>
-</section>
-
-<!-- ================= 纪要查看 / 编辑 ================= -->
-<section class="view hidden" id="viewMinutes">
-  <div class="view-head">
-    <button class="back-btn" id="backFromMinutes">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      首页
-    </button>
-    <span class="view-title">会议纪要</span>
-    <span class="minutes-path" id="minutesPath"></span>
-  </div>
-  <div class="minutes-head">
-    <div class="minutes-tools">
-      <button class="btn ghost" id="btnToggleEdit">编辑</button>
-      <button class="btn primary" id="btnSaveMinutes" disabled>保存</button>
-      <button class="btn ghost" id="btnExport">导出到…</button>
-      <button class="btn ghost" id="btnOpenFolder">打开文件夹</button>
-    </div>
-  </div>
-  <div class="card minutes-body-card">
-    <div class="edit-hint hidden" id="editHint">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-      编辑中：直接在页面上修改文字与表格，完成后点「保存」
-    </div>
-    <div class="md-body" id="minutesBody" contenteditable="false"></div>
-  </div>
-</section>
-
-</main>
-
-<!-- 共享进度面板（JS 在视图间移动；仅录制/导入视图显示） -->
-<div id="progressPanel" class="card progress-card hidden">
-  <div class="phero">
-    <div class="picon" id="pIcon">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    </div>
-    <div style="flex:1">
-      <div class="ptext" id="pText">就绪</div>
-      <div class="psub" id="pSub"></div>
-    </div>
-  </div>
-  <div class="err-box hidden" id="pErr"></div>
-  <div class="steps">
-    <div class="step" data-step="1"><div class="dot"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><div class="name">录制</div></div>
-    <div class="step" data-step="2"><div class="dot"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><div class="name">上传</div></div>
-    <div class="step" data-step="3"><div class="dot"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><div class="name">转写</div></div>
-    <div class="step" data-step="4"><div class="dot"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><div class="name">纪要</div></div>
-  </div>
-  <button class="log-toggle" id="btnToggleLog">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-    查看技术日志
-  </button>
-  <div class="log hidden" id="log"></div>
-</div>
-
-<!-- 设置（全局） -->
-<div class="overlay hidden" id="settingsOverlay">
-  <div class="card modal">
-    <div class="modal-title">设置</div>
-    <div class="modal-sub">全局设置，保存在本机 ~/.meetingkit/config.toml</div>
-    <div class="form">
-      <div class="sec">连接</div>
-      <div class="field">
-        <label>百炼 API Key</label>
-        <div class="pw">
-          <input id="setKey" type="password" placeholder="sk-..." autocomplete="off">
-          <button class="eye" id="btnEye" type="button" title="显示/隐藏">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      <div class="import-layout">
+        <section class="surface import-card">
+          <div class="surface-title"><span>01</span><div><h2>选择会议文件</h2><p>支持常见音频与视频格式</p></div></div>
+          <button class="drop-zone" id="btnPickFile" type="button">
+            <span><svg viewBox="0 0 24 24"><path d="M4 15v5h16v-5M8 9l4-4 4 4M12 5v11"/></svg></span>
+            <strong>点击选择音频 / 视频</strong>
+            <small>WAV、MP3、M4A、FLAC、MP4、MOV 等</small>
           </button>
+          <div class="chosen-file hidden" id="chosenFile"><span class="file-badge">AUDIO</span><div><strong id="importFileName"></strong><small id="importFilePath"></small></div></div>
+          <div class="field"><label for="attendeesImp">参会人 <small>可选，每行一个</small></label><textarea id="attendeesImp" rows="4" placeholder="张三&#10;李四"></textarea></div>
+          <button class="button primary wide" id="btnStartImport" type="button" disabled>开始生成纪要</button>
+        </section>
+        <div class="import-stack">
+          <div id="progressMountImport"></div>
+          <aside class="process-note">
+            <span class="eyebrow light">WHAT HAPPENS NEXT</span>
+            <h2>从原始声音到可执行结论</h2>
+            <ol><li><b>01</b><span><strong>读取文件</strong><small>检查格式并准备上传</small></span></li><li><b>02</b><span><strong>识别发言</strong><small>转写全文并区分说话人</small></span></li><li><b>03</b><span><strong>提炼要点</strong><small>生成摘要、决策与行动项</small></span></li></ol>
+            <p>原始文件不会被移动；结果会保存到当前输出目录。</p>
+          </aside>
         </div>
       </div>
-      <div class="field">
-        <label>API 网关（公司专属网关时填写）</label>
-        <input id="setHost" placeholder="留空 = 官方端点 dashscope.aliyuncs.com">
-        <div class="hint">形如 https://ws-xxx.cn-beijing.maas.aliyuncs.com（见百炼开通说明中的 API Host）</div>
-      </div>
-      <div class="sec">模型</div>
-      <div class="row">
-        <div class="field" style="flex:1"><label>转写模型</label>
-          <select id="setTM"><option>fun-asr</option><option>paraformer-v2</option></select></div>
-        <div class="field" style="flex:1"><label>纪要模型</label>
-          <select id="setLM"><option>qwen-flash</option><option>qwen-plus</option><option>qwen-max</option></select></div>
-      </div>
-      <div class="sec">输出</div>
-      <div class="field">
-        <label>输出目录</label>
-        <div class="row">
-          <input id="setOut" style="flex:1">
-          <button class="btn ghost" id="btnBrowseOut">浏览…</button>
+    </section>
+
+    <section class="view minutes-view" id="viewMinutes" data-view-panel="minutes">
+      <div class="editor-topline">
+        <div><span class="eyebrow simple">MINUTES STUDIO</span><h1>纪要编辑</h1></div>
+        <div class="editor-actions">
+          <span class="save-state" id="saveState"><i></i> 未选择纪要</span>
+          <button class="button secondary compact" id="btnTranscript" type="button" disabled>查看转写</button>
+          <button class="button secondary compact" id="btnOpenFolder" type="button" disabled>打开文件夹</button>
+          <button class="button secondary compact" id="btnExport" type="button" disabled>导出</button>
+          <button class="button primary compact" id="btnSaveMinutes" type="button" disabled>保存纪要</button>
         </div>
       </div>
+
+      <div class="editor-shell">
+        <aside class="session-sidebar">
+          <div class="sidebar-head"><div><strong>会议记录</strong><small id="sessionCount">0 个纪要</small></div><button class="icon-button small" id="btnRefreshSessions" type="button" title="刷新"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.5-2L20 9M4 15l2.4 2a7 7 0 0 0 11.5-2"/></svg></button></div>
+          <div class="session-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="sessionSearch" placeholder="搜索会议"></div>
+          <div class="session-list" id="sessionList"><div class="sidebar-empty">暂无会议纪要</div></div>
+        </aside>
+
+        <section class="editor-workspace">
+          <div class="document-head">
+            <div><span class="document-kicker">MEETING NOTES</span><input id="documentTitle" value="选择一份纪要开始编辑" readonly aria-label="纪要标题"><p id="minutesPath">纪要保存在本机输出目录</p></div>
+            <div class="document-meta"><span id="documentTime">—</span><span id="documentWords">0 字</span></div>
+          </div>
+          <div class="editor-toolbar" id="editorToolbar" aria-label="编辑工具栏">
+            <select id="blockFormat" disabled aria-label="段落格式"><option value="p">正文</option><option value="h1">一级标题</option><option value="h2">二级标题</option><option value="h3">三级标题</option><option value="h4">四级标题</option><option value="h5">五级标题</option><option value="h6">六级标题</option><option value="blockquote">引用</option></select>
+            <span class="tool-divider"></span>
+            <button data-command="bold" type="button" disabled title="粗体"><b>B</b></button>
+            <button data-command="italic" type="button" disabled title="斜体"><i>I</i></button>
+            <button data-command="insertUnorderedList" type="button" disabled title="无序列表">•≡</button>
+            <button data-command="insertOrderedList" type="button" disabled title="有序列表">1≡</button>
+            <button data-command="createLink" type="button" disabled title="添加链接"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"/></svg></button>
+            <button data-command="insertTable" type="button" disabled title="插入行动项表格"><svg viewBox="0 0 24 24"><path d="M3 5h18v14H3zM3 10h18M9 5v14"/></svg></button>
+            <span class="table-tools" id="tableTools">
+              <button data-table-action="addRow" type="button" disabled title="在下方增加一行">+行</button>
+              <button data-table-action="deleteRow" type="button" disabled title="删除当前行">−行</button>
+              <button data-table-action="addColumn" type="button" disabled title="在右侧增加一列">+列</button>
+              <button data-table-action="deleteColumn" type="button" disabled title="删除当前列">−列</button>
+            </span>
+            <span class="tool-divider"></span>
+            <button data-command="undo" type="button" disabled title="撤销">↶</button>
+            <button data-command="redo" type="button" disabled title="重做">↷</button>
+            <button data-command="removeFormat" type="button" disabled title="清除格式">Tx</button>
+          </div>
+          <article class="minutes-editor empty" id="minutesBody" contenteditable="false">
+            <div class="editor-empty"><span><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/></svg></span><strong>选择左侧会议纪要</strong><small>这里可以直接编辑标题、段落、列表和行动项表格。</small></div>
+          </article>
+          <footer class="editor-footer"><span>自动将可视编辑内容转换为 Markdown 保存</span><span><kbd>⌘</kbd> + <kbd>S</kbd> 保存</span></footer>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <section class="progress-panel hidden" id="progressPanel">
+    <div class="progress-main">
+      <span class="progress-icon" id="pIcon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+      <div><span class="eyebrow simple" id="pLabel">PROCESS STATUS</span><h2 id="pText">等待任务</h2><p id="pSub">完成录制或选择文件后，这里会显示处理进度。</p></div>
+      <button class="button secondary compact hidden" id="btnOpenResult" type="button">打开纪要</button>
     </div>
-    <div class="modal-actions">
-      <button class="btn ghost" id="btnCancelSettings">取消</button>
-      <button class="btn primary" id="btnSaveSettings">保存</button>
+    <div class="progress-error hidden" id="pErr"></div>
+    <div class="progress-steps" id="progressSteps">
+      <div data-step="1"><i>1</i><span><b>准备</b><small>音频就绪</small></span></div>
+      <div data-step="2"><i>2</i><span><b>上传</b><small>百炼临时存储</small></span></div>
+      <div data-step="3"><i>3</i><span><b>转写</b><small>说话人分离</small></span></div>
+      <div data-step="4"><i>4</i><span><b>纪要</b><small>提炼关键信息</small></span></div>
     </div>
+    <button class="log-toggle" id="btnToggleLog" type="button">查看运行日志 <span>⌄</span></button>
+    <div class="log-view hidden" id="log"></div>
+  </section>
+
+  <div class="overlay hidden" id="settingsOverlay" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <section class="modal settings-modal">
+      <div class="modal-head"><div><span class="eyebrow simple">PREFERENCES</span><h2 id="settingsTitle">设置</h2><p>设置仅保存在这台电脑上。</p></div><button class="modal-close" data-close="settingsOverlay" type="button">×</button></div>
+      <div class="modal-body form-grid">
+        <div class="form-section"><span>01</span><div><strong>百炼连接</strong><small>用于转写和生成纪要</small></div></div>
+        <div class="field full"><label for="setKey">API Key</label><div class="password-field"><input id="setKey" type="password" placeholder="sk-..." autocomplete="off"><button id="btnEye" type="button">显示</button></div></div>
+        <div class="field full"><label for="setHost">API 网关 <small>留空使用官方端点</small></label><input id="setHost" placeholder="https://ws-xxx.cn-beijing.maas.aliyuncs.com"></div>
+        <div class="form-section"><span>02</span><div><strong>模型与输出</strong><small>调整处理质量和保存位置</small></div></div>
+        <div class="field"><label for="setTM">转写模型</label><select id="setTM"><option>fun-asr</option><option>paraformer-v2</option></select></div>
+        <div class="field"><label for="setLM">纪要模型</label><select id="setLM"><option>qwen-flash</option><option>qwen-plus</option><option>qwen-max</option></select></div>
+        <div class="field full"><label for="setOut">输出目录</label><div class="input-action"><input id="setOut"><button class="button secondary compact" id="btnBrowseOut" type="button">浏览</button></div></div>
+      </div>
+      <div class="modal-foot"><button class="button secondary" data-close="settingsOverlay" type="button">取消</button><button class="button primary" id="btnSaveSettings" type="button">保存设置</button></div>
+    </section>
   </div>
-</div>
 
-<!-- 首次配置（安装录音驱动） -->
-<div class="overlay hidden" id="setupOverlay">
-  <div class="card modal" style="width:480px">
-    <div class="modal-title">首次使用配置</div>
-    <div class="modal-sub">只需这一次，之后打开即用</div>
-    <div style="font-size:13.5px;color:var(--ink2);line-height:1.7">
-      需要安装开源录音驱动 <b>BlackHole</b>（约 100 KB，GNU GPL 授权，随程序内置、不上传任何数据），
-      用于把会议声音录进程序。<br><br>
-      点击下方按钮后会弹出系统密码框，输入开机密码即可完成安装。
-    </div>
-    <div class="modal-actions">
-      <button class="btn ghost" id="btnSetupCancel">取消</button>
-      <button class="btn primary" id="btnSetupInstall">一键安装并开始录音</button>
-    </div>
+  <div class="overlay hidden" id="guideOverlay" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+    <section class="modal content-modal">
+      <div class="modal-head"><div><span class="eyebrow simple">GETTING STARTED</span><h2 id="guideTitle">使用说明</h2><p>三分钟完成首次配置，之后打开即用。</p></div><button class="modal-close" data-close="guideOverlay" type="button">×</button></div>
+      <div class="guide-steps">
+        <article><b>01</b><div><h3>配置百炼 API</h3><p>点击右上角设置，填写 API Key。公司有专属网关时再填写 API Host。</p></div></article>
+        <article><b>02</b><div><h3>选择工作方式</h3><p>实时会议使用“会议录制”；已有音视频使用“导入生成”。macOS 首次录制会提示安装 BlackHole 驱动。</p></div></article>
+        <article><b>03</b><div><h3>等待自动处理</h3><p>程序会依次完成上传、转写和纪要生成。不要在处理过程中关闭窗口。</p></div></article>
+        <article><b>04</b><div><h3>编辑与交付</h3><p>在纪要工作区校对内容，按 ⌘S 保存，也可以导出 Markdown 或打开原始转写。</p></div></article>
+      </div>
+      <div class="guide-tip"><strong>隐私提示</strong><span>会议音频和结果默认保存在本机；转写时音频会临时上传到配置的百炼服务。</span></div>
+      <div class="modal-foot"><button class="button primary" data-close="guideOverlay" type="button">知道了</button></div>
+    </section>
   </div>
-</div>
 
-<div class="toast hidden" id="toast"></div>
+  <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
+    <section class="modal content-modal">
+      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.0</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
+      <div class="release-hero"><span>0.1.0</span><div><strong>首个可用版本</strong><small>2026-08-29 · Initial release</small></div></div>
+      <div class="release-list">
+        <article><span>NEW</span><div><h3>完整会议处理闭环</h3><p>支持会议内声与麦克风双轨录制、已有音视频导入、说话人分离、自动转写与结构化纪要。</p></div></article>
+        <article><span>NEW</span><div><h3>可视化纪要编辑器</h3><p>集中管理历史会议，在应用内校对、排版、保存与导出 Markdown 纪要。</p></div></article>
+        <article><span>IMPROVED</span><div><h3>编辑器与历史记录</h3><p>支持长文滚动、完整标题层级、表格行列调整，以及带确认提示的完整会议删除。</p></div></article>
+      </div>
+      <div class="modal-foot"><button class="button primary" data-close="changelogOverlay" type="button">继续使用</button></div>
+    </section>
+  </div>
 
-<script>
-"use strict";
-const $ = id => document.getElementById(id);
-let logCount = 0, lastStatus = null, toastTimer = null;
-let logOpen = false;
-let minutesPath = null, editing = false, dirty = false, importFileChosen = null;
-const ICONS = {
-  idle: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
-  rec: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/></svg>',
-  work: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></svg>',
-  ok: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
-  bad: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
-};
+  <div class="overlay hidden" id="setupOverlay" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+    <section class="modal setup-modal">
+      <div class="modal-head"><div><span class="eyebrow simple">ONE-TIME SETUP</span><h2 id="setupTitle">安装会议内录驱动</h2><p>macOS 首次录制需要完成一次配置。</p></div><button class="modal-close" id="btnSetupCancel" type="button">×</button></div>
+      <div class="setup-visual"><span><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></span><div><strong>BlackHole 2ch</strong><small>开源 · 约 100 KB · 随应用内置</small></div></div>
+      <p class="setup-copy">它负责把会议播放的声音送进录音程序，不会读取其他文件，也不会自行上传数据。安装时系统会要求输入开机密码。</p>
+      <div class="modal-foot"><button class="button secondary" id="btnSetupLater" type="button">稍后再说</button><button class="button primary" id="btnSetupInstall" type="button">安装并开始录音</button></div>
+    </section>
+  </div>
 
-function toast(msg){
-  const t = $("toast");
-  t.textContent = msg; t.classList.remove("hidden");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.add("hidden"), 2600);
-}
-function fmtTime(sec){
-  sec = Math.max(0, Math.floor(sec));
-  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
-  const mm = String(m).padStart(2,"0"), ss = String(s).padStart(2,"0");
-  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
+  <div class="overlay hidden" id="deleteOverlay" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+    <section class="modal delete-modal">
+      <div class="modal-head"><div><span class="eyebrow danger">PERMANENT DELETE</span><h2 id="deleteTitle">移除这次会议？</h2><p>此操作会同时移除前端记录和后端文件。</p></div><button class="modal-close" data-close="deleteOverlay" type="button">×</button></div>
+      <div class="delete-warning">
+        <span><svg viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4z"/><path d="M12 9v5M12 17h.01"/></svg></span>
+        <div><strong id="deleteSessionName">会议记录</strong><small id="deleteSessionPath"></small></div>
+      </div>
+      <p class="delete-copy">确认后，程序将永久删除这次会议的整个文件夹，其中包含会议纪要、完整转写、WAV 音频和 JSON 数据。此操作无法撤销。</p>
+      <div class="modal-foot"><button class="button secondary" data-close="deleteOverlay" type="button">取消</button><button class="button danger" id="btnConfirmDelete" type="button">永久删除会议文件夹</button></div>
+    </section>
+  </div>
 
-/* ---------- 视图切换 ---------- */
-const VIEWS = ["Home", "Record", "Import", "Minutes"];
-function showView(name){
-  VIEWS.forEach(v => $("view"+v).classList.toggle("hidden", v !== name));
-  const panel = $("progressPanel");
-  if(name === "Record"){ $("progressMountRecord").appendChild(panel); panel.classList.remove("hidden"); }
-  else if(name === "Import"){ $("progressMountImport").appendChild(panel); panel.classList.remove("hidden"); }
-  else panel.classList.add("hidden");
-  if(name === "Home") loadRecent();
-}
-$("cardRecord").addEventListener("click", () => showView("Record"));
-$("cardImport").addEventListener("click", () => showView("Import"));
-$("backFromRecord").addEventListener("click", () => showView("Home"));
-$("backFromImport").addEventListener("click", () => showView("Home"));
-$("backFromMinutes").addEventListener("click", () => { if(dirty && !confirm("纪要尚未保存，确定返回？")) return; showView("Home"); });
-
-/* ---------- 人类可读的进度 ---------- */
-function friendly(stage){
-  const map = {
-    finalize: "正在完成录音…",
-    prepare: "正在处理音频…",
-    upload: "正在上传音频…",
-    submit: "正在上传音频…",
-    transcribe: "正在转写文字（自动区分说话人）…",
-    minutes: "正在生成会议纪要…",
-  };
-  return map[stage] || "";
-}
-function setHero(icon, spin, text, sub){
-  const el = $("pIcon");
-  el.className = "picon" + (spin ? " spin" : "") + (icon === "ok" ? " ok" : icon === "bad" ? " bad" : "");
-  el.innerHTML = ICONS[icon];
-  $("pText").textContent = text;
-  $("pSub").textContent = sub || "";
-}
-function renderSteps(phase, stage){
-  let states = ["","","",""];
-  if(phase === "recording") states = ["active","","",""];
-  else if(phase === "processing"){
-    if(stage === "finalize" || stage === "prepare") states = ["skip","active","",""];
-    else if(stage === "upload" || stage === "submit") states = ["done","active","",""];
-    else if(stage === "transcribe") states = ["done","done","active",""];
-    else if(stage === "minutes") states = ["done","done","done","active"];
-    else states = ["done","active","",""];
-  }
-  else if(phase === "done") states = ["done","done","done","done"];
-  else if(phase === "error"){
-    if(stage === "transcribe") states = ["done","done","err",""];
-    else if(stage === "minutes") states = ["done","done","done","err"];
-    else if(stage === "upload" || stage === "submit") states = ["done","err","",""];
-    else states = ["err","","",""];
-  }
-  document.querySelectorAll(".step").forEach((el, i) => {
-    el.className = "step" + (states[i] ? " " + states[i] : "");
-  });
-}
-function renderPill(phase){
-  const map = { idle:["","就绪"], recording:["rec","录音中"], processing:["proc","处理中"],
-                done:["done","已完成"], error:["err","出错"] };
-  const [cls, label] = map[phase] || map.idle;
-  $("statusPill").className = "pill" + (cls ? " " + cls : "");
-  $("statusText").textContent = label;
-}
-function appendLogs(logs){
-  const box = $("log");
-  if(logs.length < logCount){ box.innerHTML = ""; logCount = 0; }
-  for(let i = logCount; i < logs.length; i++){
-    const [ts, msg] = logs[i];
-    const line = document.createElement("div");
-    const t = document.createElement("span"); t.className = "ts"; t.textContent = ts;
-    const m = document.createElement("span");
-    m.className = msg.startsWith("错误") ? "errline" : (msg.startsWith("⚠") ? "warn" : "");
-    m.textContent = msg;
-    line.appendChild(t); line.appendChild(m);
-    box.appendChild(line);
-  }
-  logCount = logs.length;
-  if(logOpen) box.scrollTop = box.scrollHeight;
-}
-$("btnToggleLog").addEventListener("click", () => {
-  logOpen = !logOpen;
-  $("log").classList.toggle("hidden", !logOpen);
-  $("btnToggleLog").lastChild.textContent = logOpen ? " 收起技术日志" : " 查看技术日志";
-});
-
-/* ---------- 轮询 ---------- */
-let doneHandled = false;
-async function poll(){
-  try{
-    const st = await pywebview.api.get_status();
-    renderPill(st.phase);
-    renderSteps(st.phase, st.stage);
-    appendLogs(st.logs);
-
-    const busy = st.phase === "recording" || st.phase === "processing";
-    const rec = st.phase === "recording";
-    // 录音控件
-    $("timer").textContent = rec ? fmtTime(st.elapsed) : "00:00";
-    $("timer").classList.toggle("dim", !rec);
-    const btn = $("btnRecord");
-    btn.classList.toggle("rec", rec);
-    btn.disabled = st.phase === "processing";
-    $("recHint").textContent = rec ? "录音中… 点击红色按钮停止并生成纪要"
-      : (st.phase === "processing" ? "处理中，请稍候" : "点击开始 · 内录 + 麦克风，结束后自动生成纪要");
-    ["titleInput","attendeesRec","systemSelect","micSelect","btnRefresh"].forEach(id => $(id).disabled = busy);
-    $("btnStartImport").disabled = busy || !importFileChosen;
-    $("btnPickFile").style.pointerEvents = busy ? "none" : "";
-
-    // 进度主区
-    if(st.phase === "idle") setHero("idle", false, "就绪", "准备就绪，等待开始");
-    else if(rec) setHero("rec", true, "正在录音 " + fmtTime(st.elapsed), "内录 + 麦克风双轨采集中");
-    else if(st.phase === "processing") setHero("work", true, friendly(st.stage), st.detail || "");
-    else if(st.phase === "done"){
-      setHero("ok", false, "会议纪要已生成", "点击可查看、编辑、导出");
-      if(!doneHandled){ doneHandled = true; loadRecent(); openMinutes(st.result && st.result.minutes); }
-    }
-    else if(st.phase === "error"){
-      setHero("bad", false, "出错了", "");
-      $("pErr").textContent = st.error || "未知错误";
-      doneHandled = false;
-    }
-    if(st.phase !== "error") $("pErr").classList.add("hidden");
-    else $("pErr").classList.remove("hidden");
-    if(st.phase !== "done") doneHandled = false;
-
-    // mac 提示
-    if(!st.is_windows){
-      const sysNone = (st.devices.system_sources || []).length === 0;
-      $("macNote").textContent = !st.loopback_ready
-        ? "首次点击录音会自动安装录音驱动并完成配置（仅需一次管理员密码）。"
-        : (sysNone ? "未检测到系统声音源，本次将只录麦克风。" : "");
-      $("macNote").classList.toggle("hidden", st.loopback_ready && !sysNone);
-    }
-    lastStatus = st;
-  }catch(e){ /* pywebview 未就绪时忽略 */ }
-}
-
-/* ---------- 设备 ---------- */
-async function loadDevices(){
-  try{
-    const r = await pywebview.api.refresh_devices();
-    const cfg = await pywebview.api.get_config();
-    const micSel = $("micSelect");
-    micSel.innerHTML = "";
-    const micDefault = document.createElement("option");
-    micDefault.textContent = "（系统默认麦克风）";
-    micSel.appendChild(micDefault);
-    (r.devices.microphones || []).forEach(name => {
-      const o = document.createElement("option"); o.textContent = name;
-      if(cfg.microphone === name) o.selected = true;
-      micSel.appendChild(o);
-    });
-    const sysSel = $("systemSelect");
-    sysSel.innerHTML = "";
-    const sysAuto = document.createElement("option");
-    sysAuto.textContent = "（自动检测 BlackHole）";
-    sysSel.appendChild(sysAuto);
-    (r.devices.system_sources || []).forEach(name => {
-      const o = document.createElement("option"); o.textContent = name;
-      if(cfg.system_source === name) o.selected = true;
-      sysSel.appendChild(o);
-    });
-    const st = await pywebview.api.get_status();
-    if(st.is_windows){
-      $("systemField").classList.add("hidden");
-      $("winHint").classList.remove("hidden");
-    }
-  }catch(e){ console.error(e); }
-}
-$("btnRefresh").addEventListener("click", loadDevices);
-
-/* ---------- 录制 ---------- */
-async function tryStartRecording(){
-  const r = await pywebview.api.start_recording(
-    $("titleInput").value, $("systemSelect").value || "", $("micSelect").value || "",
-    $("attendeesRec").value);
-  if(r.need_setup){ $("setupOverlay").classList.remove("hidden"); return; }
-  if(!r.ok) toast(r.error);
-}
-$("btnRecord").addEventListener("click", async () => {
-  const st = await pywebview.api.get_status();
-  if(st.phase === "recording"){
-    const r = await pywebview.api.stop_recording();
-    if(!r.ok) toast(r.error);
-  }else if(st.phase === "idle" || st.phase === "done" || st.phase === "error"){
-    await tryStartRecording();
-  }
-});
-$("btnSetupCancel").addEventListener("click", () => $("setupOverlay").classList.add("hidden"));
-$("btnSetupInstall").addEventListener("click", async () => {
-  const btn = $("btnSetupInstall");
-  btn.disabled = true; btn.textContent = "安装中…（请在密码框输入开机密码）";
-  try{
-    const r = await pywebview.api.setup_loopback();
-    if(r.ok){
-      $("setupOverlay").classList.add("hidden");
-      toast("驱动安装成功，即将开始录音");
-      await tryStartRecording();
-    }else toast(r.error || "安装失败");
-  }finally{
-    btn.disabled = false; btn.textContent = "一键安装并开始录音";
-  }
-});
-
-/* ---------- 导入 ---------- */
-$("btnPickFile").addEventListener("click", async () => {
-  const p = await pywebview.api.pick_audio_file();
-  if(!p) return;
-  importFileChosen = p;
-  $("importFileName").textContent = p.replace(/^.*\//, "");
-  $("btnStartImport").disabled = false;
-});
-$("btnStartImport").addEventListener("click", async () => {
-  if(!importFileChosen) return;
-  const r = await pywebview.api.process_file(importFileChosen, $("attendeesImp").value);
-  if(!r.ok) toast(r.error);
-});
-
-/* ---------- 纪要：查看 / 编辑 / 保存 / 导出 ---------- */
-function mdToHtml(md){
-  const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`(.+?)`/g,"<code>$1</code>");
-  const out = []; let inTable = false, inList = false;
-  for(const raw of md.split("\n")){
-    const line = raw.trim();
-    if(line.startsWith("|")){
-      if(/^[\s|:-]+$/.test(line)) continue;
-      if(!inTable){ out.push("<table><tbody>"); inTable = true; }
-      const cells = line.split("|").slice(1, -1).map(c => c.trim());
-      out.push("<tr>" + cells.map(c => `<td>${inline(c)}</td>`).join("") + "</tr>");
-      continue;
-    } else if(inTable){ out.push("</tbody></table>"); inTable = false; }
-    const h = line.match(/^(#{1,4})\s+(.*)$/);
-    if(h){ out.push(`<h${h[1].length + 1}>${inline(h[2])}</h${h[1].length + 1}>`); continue; }
-    if(/^[-*]\s+/.test(line)){
-      if(!inList){ out.push("<ul>"); inList = true; }
-      out.push("<li>" + inline(line.replace(/^[-*]\s+/, "")) + "</li>");
-      continue;
-    } else if(inList){ out.push("</ul>"); inList = false; }
-    if(line === "") continue;
-    out.push("<p>" + inline(line) + "</p>");
-  }
-  if(inTable) out.push("</tbody></table>");
-  if(inList) out.push("</ul>");
-  return out.join("\n");
-}
-async function openMinutes(path){
-  if(!path) return;
-  const r = await pywebview.api.get_minutes(path);
-  if(!r.ok){ toast(r.error); return; }
-  minutesPath = path; dirty = false; editing = false;
-  $("minutesPath").textContent = path;
-  $("minutesBody").innerHTML = mdToHtml(r.content);
-  $("minutesBody").setAttribute("contenteditable", "false");
-  $("editHint").classList.add("hidden");
-  $("btnToggleEdit").textContent = "编辑";
-  $("btnSaveMinutes").disabled = true;
-  showView("Minutes");
-}
-/* DOM -> Markdown（与 mdToHtml 配对的序列化，保存所见即所得的编辑结果） */
-function domToMarkdown(root){
-  const lines = [];
-  const inline = (node) => {
-    let s = "";
-    node.childNodes.forEach(n => {
-      if(n.nodeType === 3) s += n.textContent;
-      else if(n.nodeName === "B" || n.nodeName === "STRONG") s += "**" + inline(n) + "**";
-      else if(n.nodeName === "CODE") s += "`" + n.textContent + "`";
-      else if(n.nodeName === "BR") s += " ";
-      else s += inline(n);
-    });
-    return s;
-  };
-  root.childNodes.forEach(el => {
-    if(el.nodeType === 3){
-      const t = el.textContent.trim();
-      if(t) lines.push(t);
-      return;
-    }
-    const tag = el.nodeName;
-    if(/^H[1-6]$/.test(tag)){
-      const lvl = Math.min(4, Math.max(1, parseInt(tag[1]) - 1)); // h2 -> #
-      lines.push("#".repeat(lvl) + " " + inline(el).trim());
-    } else if(tag === "P" || tag === "DIV"){
-      const t = inline(el).trim();
-      if(t) lines.push(t);
-    } else if(tag === "UL" || tag === "OL"){
-      el.querySelectorAll(":scope > li").forEach(li => {
-        const t = inline(li).trim();
-        if(t) lines.push("- " + t);
-      });
-    } else if(tag === "TABLE"){
-      const rows = [...el.querySelectorAll("tr")];
-      rows.forEach((tr, i) => {
-        const cells = [...tr.querySelectorAll("td,th")]
-          .map(td => inline(td).trim().replace(/\|/g, "\\|"));
-        if(!cells.length) return;
-        lines.push("| " + cells.join(" | ") + " |");
-        if(i === 0) lines.push("|" + cells.map(() => " --- ").join("|") + "|");
-      });
-    }
-  });
-  return lines.join("\n").replace(/\n{3,}/g, "\n\n") + "\n";
-}
-function setEditable(on){
-  editing = on;
-  const body = $("minutesBody");
-  body.setAttribute("contenteditable", on ? "true" : "false");
-  $("editHint").classList.toggle("hidden", !on);
-  $("btnToggleEdit").textContent = on ? "完成编辑" : "编辑";
-  if(!on && dirty){
-    // 切回预览时保留已做的修改：序列化后重新渲染
-    body.innerHTML = mdToHtml(domToMarkdown(body));
-  }
-}
-$("btnToggleEdit").addEventListener("click", () => setEditable(!editing));
-$("minutesBody").addEventListener("input", () => {
-  if(!editing) return;
-  dirty = true;
-  $("btnSaveMinutes").disabled = false;
-});
-$("btnSaveMinutes").addEventListener("click", async () => {
-  const md = domToMarkdown($("minutesBody"));
-  const r = await pywebview.api.save_minutes(minutesPath, md);
-  if(r.ok){
-    dirty = false;
-    $("btnSaveMinutes").disabled = true;
-    $("minutesBody").innerHTML = mdToHtml(md); // 以存储内容为准重新渲染
-    toast("已保存");
-    loadRecent();
-  } else toast(r.error);
-});
-$("btnExport").addEventListener("click", async () => {
-  if(dirty && !confirm("纪要尚未保存，先保存后再导出？")) return;
-  const r = await pywebview.api.export_minutes(minutesPath);
-  if(r.ok) toast("已导出到：" + r.dest);
-  else if(r.error && r.error !== "未选择导出目录") toast(r.error);
-});
-$("btnOpenFolder").addEventListener("click", () => {
-  if(lastStatus && lastStatus.session_dir) pywebview.api.reveal(lastStatus.session_dir);
-  else if(minutesPath) pywebview.api.reveal(minutesPath);
-});
-
-/* ---------- 最近会议 ---------- */
-async function loadRecent(){
-  try{
-    const r = await pywebview.api.list_sessions();
-    const box = $("recentList");
-    if(!r.sessions || !r.sessions.length){
-      box.innerHTML = '<div class="empty-tip">还没有生成过纪要</div>';
-      return;
-    }
-    box.innerHTML = "";
-    r.sessions.forEach(s => {
-      const row = document.createElement("div");
-      row.className = "recent-item";
-      row.innerHTML = `<span class="recent-name"></span><span class="recent-time"></span><button class="recent-open">查看纪要</button>`;
-      row.querySelector(".recent-name").textContent = s.name;
-      row.querySelector(".recent-time").textContent = s.mtime;
-      row.querySelector(".recent-open").addEventListener("click", () => openMinutes(s.minutes));
-      box.appendChild(row);
-    });
-  }catch(e){ /* ignore */ }
-}
-
-/* ---------- 设置（全局） ---------- */
-async function openSettings(){
-  const c = await pywebview.api.get_config();
-  $("setKey").value = c.api_key || "";
-  $("setHost").value = c.api_host || "";
-  $("setTM").value = c.transcribe_model || "fun-asr";
-  $("setLM").value = c.llm_model || "qwen-flash";
-  $("setOut").value = c.output_dir || "";
-  $("settingsOverlay").classList.remove("hidden");
-}
-$("btnSettings").addEventListener("click", openSettings);
-$("btnCancelSettings").addEventListener("click", () => $("settingsOverlay").classList.add("hidden"));
-$("btnEye").addEventListener("click", () => {
-  const k = $("setKey");
-  k.type = k.type === "password" ? "text" : "password";
-});
-$("btnBrowseOut").addEventListener("click", async () => {
-  const p = await pywebview.api.pick_folder();
-  if(p) $("setOut").value = p;
-});
-$("btnSaveSettings").addEventListener("click", async () => {
-  const r = await pywebview.api.save_config({
-    api_key: $("setKey").value,
-    api_host: $("setHost").value,
-    transcribe_model: $("setTM").value,
-    llm_model: $("setLM").value,
-    output_dir: $("setOut").value,
-  });
-  if(r.ok){ $("settingsOverlay").classList.add("hidden"); toast("设置已保存"); }
-  else toast("保存失败：" + r.error);
-});
-$("settingsOverlay").addEventListener("click", e => {
-  if(e.target === $("settingsOverlay")) $("settingsOverlay").classList.add("hidden");
-});
-
-/* ---------- 启动 ---------- */
-window.addEventListener("pywebviewready", () => {
-  loadDevices();
-  loadRecent();
-  setInterval(poll, 600);
-  poll();
-});
-</script>
+  <div class="toast hidden" id="toast" role="status"></div>
+  <script src="app.js"></script>
 </body>
 </html>

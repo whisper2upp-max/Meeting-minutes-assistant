@@ -12,6 +12,12 @@ outputs/
 # 密钥与本地敏感信息，绝不提交
 百炼.md
 *.key
+.env
+.env.*
+config.toml
+*.pem
+*.p12
+*.pfx
 
 # 本地会话/工具产物
 .zcode/

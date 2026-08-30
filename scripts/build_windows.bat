@@ -11,6 +11,8 @@ if not exist .venv\Scripts\python.exe (
   --name "会议纪要助手" ^
   --paths src ^
   --add-data "src\meetingkit\webui\index.html;meetingkit\webui" ^
+  --add-data "src\meetingkit\webui\styles.css;meetingkit\webui" ^
+  --add-data "src\meetingkit\webui\app.js;meetingkit\webui" ^
   --hidden-import meetingkit.audio.windows_rec ^
   --hidden-import pyaudiowpatch ^
   --hidden-import webview.platforms.winforms ^
