@@ -2,6 +2,14 @@
 
 本项目遵循语义化版本。日期使用 `YYYY-MM-DD` 格式。
 
+## 0.1.2 — 2026-08-30
+
+### 修复
+
+- 修复 Windows 会议录制启动时报 `Stream.__init__() got an unexpected keyword argument 'as_loopback'`。
+- 按 PyAudioWPatch 的正式接口直接打开默认输出设备对应的 WASAPI 回环输入，不再传入其他音频库的参数。
+- 将 Windows 录音测试替身改为显式的 PyAudio 参数签名，防止未知关键字参数再次绕过测试。
+
 ## 0.1.1 — 2026-08-30
 
 ### 修复

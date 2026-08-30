@@ -23,8 +23,16 @@ class _FakeAudio:
             raise OSError("no default output")
         return self.device
 
-    def open(self, **kwargs):
-        self.open_calls.append(kwargs)
+    def open(self, *, format, channels, rate, input, input_device_index,
+             frames_per_buffer):
+        self.open_calls.append({
+            "format": format,
+            "channels": channels,
+            "rate": rate,
+            "input": input,
+            "input_device_index": input_device_index,
+            "frames_per_buffer": frames_per_buffer,
+        })
         return _FakeStream()
 
 
@@ -48,7 +56,6 @@ def test_default_wasapi_loopback_opens_system_track(tmp_path, monkeypatch):
         "rate": 48000,
         "input": True,
         "input_device_index": 17,
-        "as_loopback": True,
         "frames_per_buffer": 2048,
     }]
     recorder._cleanup()
