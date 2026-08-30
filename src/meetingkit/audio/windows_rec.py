@@ -70,7 +70,10 @@ class WindowsRecorder:
             except OSError:
                 pass
         if dev is None:
-            return
+            raise RuntimeError(
+                "未检测到 Windows 默认输出设备的 WASAPI 回环，无法录制会议内声。"
+                "请先在 Windows 声音设置中选择并启用默认输出设备。"
+            )
         rate = int(dev["defaultSampleRate"])
         # loopback 流按设备混合格式（通常 2 声道）打开，写入时自动降混单声道
         channels = min(2, int(dev.get("maxInputChannels", 2)) or 2)

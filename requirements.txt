@@ -2,6 +2,8 @@
 dashscope>=1.27
 openai>=1.40
 requests>=2.28
+# Windows 通过 CryptoAPI 使用系统信任证书（支持企业根证书/中间证书）
+truststore==0.10.4; sys_platform == 'win32'
 numpy>=1.26
 sounddevice>=0.4.6
 tomli-w>=1.0

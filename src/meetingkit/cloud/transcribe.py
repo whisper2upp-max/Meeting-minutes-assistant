@@ -18,6 +18,8 @@ from typing import Callable, List, Optional
 
 import requests
 
+from ..tls import certificate_error_help, is_certificate_verification_error
+
 Progress = Callable[[str, str], None]
 
 _POLL_INTERVAL_SEC = 5
@@ -65,6 +67,12 @@ class TranscribeError(RuntimeError):
     pass
 
 
+def _network_error(prefix: str, exc: BaseException) -> TranscribeError:
+    if is_certificate_verification_error(exc):
+        return TranscribeError(f"{prefix}：{certificate_error_help()}")
+    return TranscribeError(f"{prefix}：{exc}")
+
+
 def _log(progress: Optional[Progress], stage: str, detail: str = "") -> None:
     if progress:
         progress(stage, detail)
@@ -80,12 +88,14 @@ def upload_audio(file_path: Path, *, api_key: str, model: str, base_url: str = "
         oss_url, _ = sdk["OssUtils"].upload(model=model, file_path=str(file_path),
                                             api_key=api_key)
     except sdk["DashScopeException"] as exc:
+        if is_certificate_verification_error(exc):
+            raise _network_error("音频上传失败", exc) from exc
         raise TranscribeError(
             f"音频上传失败：{exc}\n请检查 API Key、网络与网关地址（默认 dashscope.aliyuncs.com，"
             f"公司专属网关在“设置”中填写）。"
         ) from exc
     except Exception as exc:
-        raise TranscribeError(f"音频上传失败：{exc}") from exc
+        raise _network_error("音频上传失败", exc) from exc
     if not oss_url or not oss_url.startswith("oss://"):
         raise TranscribeError(f"音频上传返回异常 URL：{oss_url!r}")
     return oss_url
@@ -127,7 +137,7 @@ def transcribe_file(
             **params,
         )
     except Exception as exc:
-        raise TranscribeError(f"转写任务提交失败：{exc}") from exc
+        raise _network_error("转写任务提交失败", exc) from exc
 
     task_id = _extract(task, "output", "task_id") or ""
     if task.status_code != 200 or not task_id:
@@ -150,7 +160,7 @@ def transcribe_file(
         try:
             task = sdk["Transcription"].fetch(task, api_key=api_key)
         except sdk["DashScopeException"] as exc:
-            raise TranscribeError(f"查询转写任务失败：{exc}") from exc
+            raise _network_error("查询转写任务失败", exc) from exc
         _log(progress, "transcribe",
              f"云端处理中… 已等待 {int(time.monotonic() - started)} 秒（状态 {status or 'PENDING'}）")
 
@@ -165,7 +175,7 @@ def transcribe_file(
     try:
         detail = requests.get(result_url, timeout=120).json()
     except Exception as exc:
-        raise TranscribeError(f"下载转写结果失败：{exc}") from exc
+        raise _network_error("下载转写结果失败", exc) from exc
 
     sentences = _parse_sentences(detail)
     if not sentences:

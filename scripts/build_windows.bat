@@ -15,6 +15,7 @@ if not exist .venv\Scripts\python.exe (
   --add-data "src\meetingkit\webui\app.js;meetingkit\webui" ^
   --hidden-import meetingkit.audio.windows_rec ^
   --hidden-import pyaudiowpatch ^
+  --hidden-import truststore._windows ^
   --hidden-import webview.platforms.winforms ^
   --hidden-import webview.platforms.edgechromium ^
   --version-file assets\version_info.txt ^

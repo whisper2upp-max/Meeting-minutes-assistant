@@ -24,19 +24,20 @@ fi
 APP="dist/会议纪要助手.app"
 # 关键：没有 NSMicrophoneUsageDescription 的 app 请求麦克风时会被 macOS 直接
 # 静默拒绝（不弹授权框、不出现在隐私列表），必须注入声明后重新 ad-hoc 签名
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.1.0" \
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.1.1" \
   "$APP/Contents/Info.plist" 2>/dev/null || \
-/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 0.1.0" \
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 0.1.1" \
   "$APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 0.1.0" \
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 0.1.1" \
   "$APP/Contents/Info.plist" 2>/dev/null || \
-/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 0.1.0" \
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 0.1.1" \
   "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :NSMicrophoneUsageDescription 会议声音录制需要访问麦克风，用于录入您自己的发言" \
   "$APP/Contents/Info.plist" 2>/dev/null || \
 /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 会议声音录制需要访问麦克风，用于录入您自己的发言" \
   "$APP/Contents/Info.plist"
 codesign --force --deep --sign - "$APP" >/dev/null 2>&1
+zip -q -r -y "dist/会议纪要助手-macOS.zip" "$APP"
 
-echo "打包完成：dist/会议纪要助手.app"
+echo "打包完成：dist/会议纪要助手.app、dist/会议纪要助手-macOS.zip"
 echo "分发提示：未签名，用户首次需右键->打开；详见 docs/使用说明-macOS.md"

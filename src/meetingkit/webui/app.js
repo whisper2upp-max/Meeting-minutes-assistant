@@ -195,7 +195,9 @@ function renderRecorder(status) {
   $("consoleSource").textContent = rec ? "双轨采集中" : status.phase === "processing" ? "处理中" : "等待开始";
   $("consoleSource").previousElementSibling?.querySelector("i")?.classList.toggle("live", rec);
   $("btnRecord").disabled = status.phase === "processing";
-  ["titleInput", "attendeesRec", "systemSelect", "micSelect", "btnRefresh"].forEach((id) => { $(id).disabled = busy; });
+  ["titleInput", "attendeesRec", "micSelect", "btnRefresh"].forEach((id) => { $(id).disabled = busy; });
+  // Windows 的会议内声固定来自默认输出设备：保持字段可见，但不让用户误以为需要选择。
+  $("systemSelect").disabled = busy || Boolean(status.is_windows);
   $("btnStartImport").disabled = busy || !state.importPath;
   $("btnPickFile").disabled = busy;
 
@@ -258,10 +260,15 @@ async function loadDevices() {
     const sources = result.devices?.system_sources || [];
     $("micSelect").replaceChildren(new Option("系统默认麦克风", ""));
     microphones.forEach((name) => $("micSelect").add(new Option(name, name, false, config.microphone === name)));
-    $("systemSelect").replaceChildren(new Option("自动检测 BlackHole", ""));
+    const isWindows = Boolean(status.is_windows);
+    $("systemSelect").replaceChildren(new Option(
+      isWindows ? "系统默认输出设备（WASAPI 自动内录）" : "自动检测 BlackHole",
+      "",
+    ));
     sources.forEach((name) => $("systemSelect").add(new Option(name, name, false, config.system_source === name)));
-    $("systemField").classList.toggle("hidden", Boolean(status.is_windows));
-    $("winHint").classList.toggle("hidden", !status.is_windows);
+    $("systemField").classList.remove("hidden");
+    $("systemSelect").disabled = isWindows;
+    $("winHint").classList.toggle("hidden", !isWindows);
   } catch (error) {
     toast(`设备刷新失败：${error}`);
   }
