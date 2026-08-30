@@ -21,7 +21,7 @@ def test_home_contains_guide_changelog_and_version():
 
     assert 'id="guideOverlay"' in html
     assert 'id="changelogOverlay"' in html
-    assert "v0.1.3" in html
+    assert "v0.1.4" in html
     assert 'data-view-panel="minutes"' in html
 
 
@@ -98,12 +98,12 @@ def test_release_builds_embed_version_metadata():
     assert '--version-file assets\\version_info.txt' in workflow
     assert '--version-file assets\\version_info.txt' in windows_script
     for content in (workflow, macos_script):
-        assert "Set :CFBundleShortVersionString 0.1.3" in content
-        assert "Set :CFBundleVersion 0.1.3" in content
-    assert "filevers=(0, 1, 3, 0)" in windows_version
-    assert "prodvers=(0, 1, 3, 0)" in windows_version
-    assert "StringStruct('FileVersion', '0.1.3')" in windows_version
-    assert "StringStruct('ProductVersion', '0.1.3')" in windows_version
+        assert "Set :CFBundleShortVersionString 0.1.4" in content
+        assert "Set :CFBundleVersion 0.1.4" in content
+    assert "filevers=(0, 1, 4, 0)" in windows_version
+    assert "prodvers=(0, 1, 4, 0)" in windows_version
+    assert "StringStruct('FileVersion', '0.1.4')" in windows_version
+    assert "StringStruct('ProductVersion', '0.1.4')" in windows_version
 
 
 def test_windows_release_uses_native_certificate_store():

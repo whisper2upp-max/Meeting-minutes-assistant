@@ -8,7 +8,7 @@ from __future__ import annotations
 import queue
 import threading
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from .base import WavTrackWriter, TrackSpec
 
@@ -17,15 +17,55 @@ _QUEUE_STOP = object()
 
 
 def list_microphones() -> List[str]:
-    """可选的麦克风设备名列表。"""
-    return [d["name"] for d in _list_input_devices()]
+    """可选的麦克风设备名列表（仅真实 WASAPI 输入，按名称去重）。"""
+    names: List[str] = []
+    seen = set()
+    for device in _list_input_devices():
+        name = str(device.get("name", "")).strip()
+        key = name.casefold()
+        if name and key not in seen:
+            names.append(name)
+            seen.add(key)
+    return names
+
+
+def _wasapi_input_devices(p) -> Tuple[dict, List[dict]]:
+    """返回 WASAPI 主机信息和真实的麦克风端点。
+
+    PyAudioWPatch 会同时暴露 MME、DirectSound、WASAPI 以及 loopback
+    端点。如果全部放入麦克风列表，同一物理设备会重复出现，
+    还可能选中输出回环或旧的 Sound Mapper 端点。
+    """
+    import pyaudiowpatch as pyaudio
+
+    try:
+        host = p.get_host_api_info_by_type(pyaudio.paWASAPI)
+    except OSError as exc:
+        raise RuntimeError(
+            "未检测到 Windows WASAPI 音频主机，无法录制麦克风。"
+        ) from exc
+
+    host_index = int(host["index"])
+    devices = []
+    for device in p.get_device_info_generator():
+        if int(device.get("hostApi", -1)) != host_index:
+            continue
+        if int(device.get("maxInputChannels", 0)) <= 0:
+            continue
+        if bool(device.get("isLoopbackDevice", False)):
+            continue
+        if not str(device.get("name", "")).strip():
+            continue
+        devices.append(device)
+    return host, devices
 
 
 def _list_input_devices() -> List[dict]:
     import pyaudiowpatch as pyaudio
     p = pyaudio.PyAudio()
     try:
-        return [d for d in p.get_device_info_generator() if d.get("maxInputChannels", 0) > 0]
+        _, devices = _wasapi_input_devices(p)
+        return devices
     finally:
         p.terminate()
 
@@ -127,23 +167,45 @@ class WindowsRecorder:
 
     def _open_mic(self, out_dir: Path) -> None:
         import pyaudiowpatch as pyaudio
-        dev_idx = None
-        default = self._pa.get_default_input_device_info()
+
+        host, devices = _wasapi_input_devices(self._pa)
+        default_index = int(host.get("defaultInputDevice", -1))
+        dev = None
         if self._mic_name:
-            for d in _list_input_devices():
-                if d["name"] == self._mic_name:
-                    dev_idx = int(d["index"])
-                    break
-        if dev_idx is None and not self._mic_name:
-            dev_idx = int(default["index"])
-        if dev_idx is None:
-            return
-        rate = int(self._pa.get_device_info_by_index(dev_idx)["defaultSampleRate"])
-        writer = WavTrackWriter(out_dir / "track_mic.wav", rate)
+            matches = [d for d in devices if d["name"] == self._mic_name]
+            if matches:
+                # 极少数驱动会在同一 WASAPI 主机下重复同名端点；
+                # 同名时优先使用 Windows 默认输入。
+                dev = next(
+                    (d for d in matches if int(d["index"]) == default_index),
+                    matches[0],
+                )
+            else:
+                raise RuntimeError(
+                    f"未找到已选麦克风“{self._mic_name}”。"
+                    "设备可能已拔出，请刷新设备后重新选择。"
+                )
+        else:
+            dev = next(
+                (d for d in devices if int(d["index"]) == default_index),
+                None,
+            )
+            if dev is None:
+                raise RuntimeError(
+                    "未检测到 Windows 默认麦克风。"
+                    "请先在 Windows 设置 → 系统 → 声音 中选择默认输入设备。"
+                )
+
+        dev_idx = int(dev["index"])
+        rate = int(dev["defaultSampleRate"])
+        # 某些 Windows 麦克风阵列的 WASAPI 混音格式只接受双声道。
+        # 按设备支持的声道打开，WavTrackWriter 再安全降混为单声道。
+        channels = min(2, int(dev.get("maxInputChannels", 1)) or 1)
+        writer = WavTrackWriter(out_dir / "track_mic.wav", rate, channels)
         audio_queue = queue.SimpleQueue()
         try:
             stream = self._pa.open(
-                format=pyaudio.paInt16, channels=1, rate=rate, input=True,
+                format=pyaudio.paInt16, channels=channels, rate=rate, input=True,
                 input_device_index=dev_idx,
                 frames_per_buffer=_BLOCK_FRAMES,
                 stream_callback=self._make_callback(audio_queue),

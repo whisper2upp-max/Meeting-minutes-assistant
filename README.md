@@ -2,7 +2,7 @@
 
 > 会议纪要助手：同步录制会议内声与麦克风，或导入已有音视频，自动完成说话人分离、全文转写和结构化会议纪要。
 
-[![Version](https://img.shields.io/badge/version-0.1.3-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.1.4-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-18213d.svg)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0aa6b5.svg)
 
@@ -12,7 +12,7 @@
 
 ## 下载
 
-前往 [Releases](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest) 下载对应平台的 v0.1.3 安装包。
+前往 [Releases](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest) 下载对应平台的 v0.1.4 安装包。
 
 | 平台 | 发布文件 | 首次启动 |
 | --- | --- | --- |
@@ -74,6 +74,8 @@ Windows v0.1.1 起使用系统证书库校验百炼 HTTPS 连接，兼容由公�
 Windows v0.1.2 修复 WASAPI 回环流启动参数不兼容问题；会议录制会直接读取默认输出设备对应的 PyAudioWPatch 回环输入。
 
 Windows v0.1.3 修复结束录音时的原生音频流关闭竞态；录音改用 PyAudio 回调收集，先停止并关闭设备流，再排空写盘队列和关闭 WAV 文件。
+
+Windows v0.1.4 修复默认麦克风可能录到静音的问题；设备列表现在只显示去重后的真实 WASAPI 输入，并按设备原生声道格式录制。
 
 ## 数据与隐私
 

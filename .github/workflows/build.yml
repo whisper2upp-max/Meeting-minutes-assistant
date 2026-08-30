@@ -72,8 +72,8 @@ jobs:
             --icon assets/app.icns \
             --osx-bundle-identifier com.meetingkit.app \
             run_app.py
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.1.3" "dist/会议纪要助手.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 0.1.3" "dist/会议纪要助手.app/Contents/Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 0.1.3" "dist/会议纪要助手.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 0.1.3" "dist/会议纪要助手.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.1.4" "dist/会议纪要助手.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 0.1.4" "dist/会议纪要助手.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 0.1.4" "dist/会议纪要助手.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 0.1.4" "dist/会议纪要助手.app/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 会议声音录制需要访问麦克风，用于录入您自己的发言" "dist/会议纪要助手.app/Contents/Info.plist"
           codesign --force --deep --sign - "dist/会议纪要助手.app"
           zip -q -r -y "dist/会议纪要助手-macOS.zip" "dist/会议纪要助手.app"
