@@ -19,7 +19,7 @@ jobs:
         run: pip install -r requirements.txt pyinstaller
       - name: 打包 exe
         run: >
-          pyinstaller --noconfirm --clean --windowed
+          pyinstaller --noconfirm --clean --windowed --onefile
           --name "会议纪要助手"
           --paths src
           --add-data "src\meetingkit\webui\index.html;meetingkit\webui"
@@ -36,6 +36,7 @@ jobs:
         with:
           name: meetingkit-windows-exe
           path: dist/会议纪要助手.exe
+          if-no-files-found: error
 
   macos:
     name: 打包 macOS app
@@ -69,3 +70,4 @@ jobs:
         with:
           name: meetingkit-macos-app
           path: dist/会议纪要助手-macOS.zip
+          if-no-files-found: error

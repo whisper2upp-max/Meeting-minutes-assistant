@@ -7,7 +7,7 @@ if not exist .venv\Scripts\python.exe (
   exit /b 1
 )
 
-.venv\Scripts\pyinstaller --noconfirm --clean --windowed ^
+.venv\Scripts\pyinstaller --noconfirm --clean --windowed --onefile ^
   --name "会议纪要助手" ^
   --paths src ^
   --add-data "src\meetingkit\webui\index.html;meetingkit\webui" ^

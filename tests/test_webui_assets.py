@@ -66,3 +66,12 @@ def test_packaging_includes_all_webui_assets():
         assert "index.html" in content, path
         assert "styles.css" in content, path
         assert "app.js" in content, path
+
+
+def test_windows_release_builds_and_requires_a_single_executable():
+    workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
+    windows_script = (ROOT / "scripts" / "build_windows.bat").read_text(encoding="utf-8")
+
+    assert "--windowed --onefile" in workflow
+    assert "--windowed --onefile" in windows_script
+    assert "if-no-files-found: error" in workflow
