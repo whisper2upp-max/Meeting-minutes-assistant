@@ -1,3 +1,4 @@
+import queue
 import sys
 import threading
 import wave
@@ -239,11 +240,30 @@ class _MonitorStream(_FakeStream):
         self.wrote.set()
 
 
+class _MonitorInputStream(_FakeStream):
+    def __init__(self, events, chunks):
+        super().__init__(events)
+        self.chunks = chunks
+        self.stopped = threading.Event()
+
+    def read(self, frame_count, exception_on_overflow=True):
+        while not self.stopped.is_set():
+            try:
+                return self.chunks.get(timeout=0.05)
+            except queue.Empty:
+                pass
+        return b""
+
+    def stop_stream(self):
+        self.stopped.set()
+        super().stop_stream()
+
+
 class _MonitorAudio:
     def __init__(self):
         self.events = []
         self.open_calls = []
-        self.callbacks = []
+        self.chunks = queue.Queue()
         self.written = []
         self.wrote = threading.Event()
         self.devices = [
@@ -257,7 +277,8 @@ class _MonitorAudio:
 
     def get_host_api_info_by_type(self, host_type):
         assert host_type == 13
-        return {"index": 2, "defaultInputDevice": 5, "defaultOutputDevice": 12}
+        # 模拟 host 默认索引陈旧；全局默认输出仍正确跟随当前 USB 耳机。
+        return {"index": 2, "defaultInputDevice": 5, "defaultOutputDevice": 99}
 
     def get_device_info_generator(self):
         return iter(self.devices)
@@ -266,12 +287,14 @@ class _MonitorAudio:
         assert index == 12
         return self.output
 
+    def get_default_output_device_info(self):
+        return self.output
+
     def open(self, **kwargs):
         self.open_calls.append(kwargs)
         if kwargs.get("output"):
             return _MonitorStream(self.events, self.written, self.wrote)
-        self.callbacks.append(kwargs["stream_callback"])
-        return _FakeStream(self.events)
+        return _MonitorInputStream(self.events, self.chunks)
 
     def terminate(self):
         self.events.append("audio.terminate")
@@ -287,7 +310,7 @@ def test_mic_monitor_routes_selected_input_to_current_default_output(monkeypatch
 
     monitor.start()
     samples = np.array([[1000, 3000], [3000, 5000]], dtype=np.int16)
-    assert audio.callbacks[0](samples.tobytes(), 2, {}, 0)[1] == 0
+    audio.chunks.put(samples.tobytes())
     assert audio.wrote.wait(timeout=1)
 
     assert monitor.active is True
@@ -298,7 +321,9 @@ def test_mic_monitor_routes_selected_input_to_current_default_output(monkeypatch
         "output_device_index": 12, "frames_per_buffer": 1024,
     }
     assert audio.open_calls[1]["input_device_index"] == 5
-    assert np.frombuffer(audio.written[0], dtype=np.int16).reshape(-1, 2)[:, 0].tolist() == [2000, 3000, 4000, 4000]
+    assert "stream_callback" not in audio.open_calls[1]
+    assert np.frombuffer(audio.written[0], dtype=np.int16).reshape(-1, 2)[:, 0].tolist() == [7000, 10500, 14000, 14000]
+    assert monitor.level > 0
 
     monitor.stop()
     assert monitor.active is False

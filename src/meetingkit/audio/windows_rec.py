@@ -16,7 +16,7 @@ from .base import WavTrackWriter, TrackSpec
 
 _BLOCK_FRAMES = 2048
 _MONITOR_FRAMES = 1024
-_MONITOR_QUEUE_SIZE = 4
+_MONITOR_GAIN = 3.5
 _QUEUE_STOP = object()
 
 
@@ -124,6 +124,20 @@ def _resolve_microphone(p, microphone: str = "") -> Tuple[dict, dict]:
 
 def _default_output_device(p, host: dict) -> dict:
     """解析当前 WASAPI 默认播放端点，用于把测试声音送到耳机/扬声器。"""
+    # PortAudio 的全局默认输出会跟随 Windows 当前选择（插入耳机后通常会
+    # 自动切换），优先使用它。旧版只读取 WASAPI host 的默认索引，在部分
+    # 驱动上该索引不会随 Windows 的通讯/多媒体默认端点同步，测试流虽然
+    # 成功启动，声音却会被送往没有在使用的端点。
+    device = None
+    try:
+        candidate = p.get_default_output_device_info()
+        if int(candidate.get("maxOutputChannels", 0)) > 0:
+            device = candidate
+    except Exception:
+        pass
+    if device is not None:
+        return device
+
     default_index = int(host.get("defaultOutputDevice", -1))
     if default_index < 0:
         raise RuntimeError(
@@ -141,7 +155,8 @@ def _default_output_device(p, host: dict) -> dict:
 
 
 def _convert_monitor_chunk(data: bytes, input_channels: int, input_rate: int,
-                           output_channels: int, output_rate: int) -> bytes:
+                           output_channels: int, output_rate: int,
+                           gain: float = 1.0) -> bytes:
     """把麦克风 PCM 安全转换为默认播放设备的声道数与采样率。"""
     samples = np.frombuffer(data, dtype=np.int16)
     usable = samples.size - (samples.size % input_channels)
@@ -154,10 +169,23 @@ def _convert_monitor_chunk(data: bytes, input_channels: int, input_rate: int,
         source_positions = np.arange(frame_count, dtype=np.float64) * input_rate / output_rate
         source_positions = np.minimum(source_positions, mono.size - 1)
         mono = np.interp(source_positions, np.arange(mono.size), mono)
-    converted = np.clip(np.rint(mono), -32768, 32767).astype(np.int16)
+    converted = np.clip(np.rint(mono * max(0.0, float(gain))), -32768, 32767).astype(np.int16)
     if output_channels > 1:
         converted = np.repeat(converted[:, None], output_channels, axis=1).reshape(-1)
     return converted.tobytes()
+
+
+def _monitor_level(data: bytes, channels: int) -> float:
+    """返回适合界面音量条的 0..1 麦克风电平。"""
+    samples = np.frombuffer(data, dtype=np.int16)
+    usable = samples.size - (samples.size % max(1, channels))
+    if usable <= 0:
+        return 0.0
+    frames = samples[:usable].reshape(-1, max(1, channels)).astype(np.float32)
+    mono = frames.mean(axis=1)
+    rms = float(np.sqrt(np.mean(np.square(mono)))) if mono.size else 0.0
+    # 约 -35 dBFS 开始可见，正常说话在音量条中段，避免低电平看起来始终为 0。
+    return min(1.0, rms / 6000.0)
 
 
 class WindowsMicMonitor:
@@ -168,12 +196,12 @@ class WindowsMicMonitor:
         self._pa = None
         self._input_stream = None
         self._output_stream = None
-        self._queue: queue.Queue = queue.Queue(maxsize=_MONITOR_QUEUE_SIZE)
         self._worker: Optional[threading.Thread] = None
         self._stopped = threading.Event()
         self._active = threading.Event()
         self._cleanup_lock = threading.Lock()
         self._error: Optional[str] = None
+        self._level = 0.0
         self._input_channels = 1
         self._input_rate = 48000
         self._output_channels = 2
@@ -181,46 +209,29 @@ class WindowsMicMonitor:
         self.input_name = ""
         self.output_name = ""
 
-    def _put_latest(self, data) -> None:
-        try:
-            self._queue.put_nowait(data)
-            return
-        except queue.Full:
-            pass
-        try:
-            self._queue.get_nowait()
-        except queue.Empty:
-            pass
-        try:
-            self._queue.put_nowait(data)
-        except queue.Full:
-            pass
-
-    def _make_callback(self):
-        import pyaudiowpatch as pyaudio
-
-        def _callback(in_data, frame_count, time_info, status_flags):
-            if status_flags and not self._stopped.is_set():
-                self._error = f"麦克风测试流状态异常：{status_flags}"
-            if self._stopped.is_set():
-                return None, pyaudio.paComplete
-            self._put_latest(in_data)
-            return None, pyaudio.paContinue
-
-        return _callback
-
     def _playback_loop(self) -> None:
         try:
             while not self._stopped.is_set():
-                data = self._queue.get()
-                if data is _QUEUE_STOP:
+                input_stream = self._input_stream
+                if input_stream is None:
                     return
+                try:
+                    data = input_stream.read(
+                        _MONITOR_FRAMES,
+                        exception_on_overflow=False,
+                    )
+                except Exception:
+                    if self._stopped.is_set():
+                        return
+                    raise
+                self._level = _monitor_level(data, self._input_channels)
                 converted = _convert_monitor_chunk(
                     data,
                     self._input_channels,
                     self._input_rate,
                     self._output_channels,
                     self._output_rate,
+                    gain=_MONITOR_GAIN,
                 )
                 if converted and self._output_stream is not None:
                     self._output_stream.write(converted, exception_on_underflow=False)
@@ -228,6 +239,7 @@ class WindowsMicMonitor:
             self._error = f"麦克风测试播放中断：{exc}"
             self._stopped.set()
         finally:
+            self._level = 0.0
             self._active.clear()
 
     def start(self) -> None:
@@ -263,7 +275,6 @@ class WindowsMicMonitor:
                 input=True,
                 input_device_index=int(mic["index"]),
                 frames_per_buffer=_MONITOR_FRAMES,
-                stream_callback=self._make_callback(),
             )
             self._active.set()
             self._worker = threading.Thread(target=self._playback_loop, daemon=True)
@@ -276,28 +287,25 @@ class WindowsMicMonitor:
         with self._cleanup_lock:
             self._stopped.set()
             self._active.clear()
+            self._level = 0.0
 
-            input_stream, self._input_stream = self._input_stream, None
+            input_stream = self._input_stream
             if input_stream is not None:
                 try:
                     input_stream.stop_stream()
                 except Exception:
                     pass
-                try:
-                    input_stream.close()
-                except Exception:
-                    pass
-
-            while True:
-                try:
-                    self._queue.get_nowait()
-                except queue.Empty:
-                    break
-            self._put_latest(_QUEUE_STOP)
 
             worker, self._worker = self._worker, None
             if worker is not None and worker is not threading.current_thread():
                 worker.join(timeout=2)
+
+            self._input_stream = None
+            if input_stream is not None:
+                try:
+                    input_stream.close()
+                except Exception:
+                    pass
 
             output_stream, self._output_stream = self._output_stream, None
             if output_stream is not None:
@@ -324,6 +332,10 @@ class WindowsMicMonitor:
     @property
     def last_error(self) -> Optional[str]:
         return self._error
+
+    @property
+    def level(self) -> float:
+        return self._level if self.active else 0.0
 
 
 class WindowsRecorder:

@@ -29,7 +29,7 @@
       <button class="status-chip" id="statusChip" type="button">
         <span class="status-dot"></span><span id="statusText">本机就绪</span>
       </button>
-      <span class="version-chip" id="versionChip">v0.1.5</span>
+      <span class="version-chip" id="versionChip">v0.1.6</span>
       <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
         <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
       </button>
@@ -114,7 +114,7 @@
         <button class="shortcut-card release" id="btnChangelog" type="button">
           <span class="shortcut-index">04</span>
           <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
-          <strong>更新日志</strong><small>v0.1.5 · Windows 麦克风测试与目录修复</small><i>查看变化 →</i>
+          <strong>更新日志</strong><small>v0.1.6 · 默认麦克风、可靠耳返与参会人匹配</small><i>查看变化 →</i>
         </button>
       </div>
 
@@ -145,7 +145,10 @@
             <select id="micSelect"></select>
             <div class="mic-test-row hidden" id="micTestRow">
               <button class="mic-test-button" id="btnMicTest" type="button" aria-pressed="false"><span></span><b>测试麦克风</b></button>
-              <p id="micTestStatus">测试时说话，声音会实时送到当前默认耳机或扬声器。</p>
+              <div class="mic-test-feedback">
+                <p id="micTestStatus">测试时说话，声音会实时送到当前默认耳机或扬声器。</p>
+                <div class="mic-level" role="meter" aria-label="麦克风输入音量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="micTestLevel"></i></div>
+              </div>
             </div>
           </div>
           <div class="info-banner hidden" id="winHint">Windows 将自动录制默认输出设备，无需选择系统声源。</div>
@@ -205,6 +208,7 @@
         <div><span class="eyebrow simple">MINUTES STUDIO</span><h1>纪要编辑</h1></div>
         <div class="editor-actions">
           <span class="save-state" id="saveState"><i></i> 未选择纪要</span>
+          <button class="button secondary compact" id="btnSpeakerMapping" type="button" disabled>匹配参会人</button>
           <button class="button secondary compact" id="btnTranscript" type="button" disabled>查看转写</button>
           <button class="button secondary compact" id="btnOpenFolder" type="button" disabled>打开文件夹</button>
           <button class="button secondary compact" id="btnExport" type="button" disabled>导出</button>
@@ -302,9 +306,12 @@
 
   <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
     <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.5</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
-      <div class="release-hero"><span>0.1.5</span><div><strong>Windows 麦克风测试与目录修复</strong><small>2026-08-31 · Maintenance release</small></div></div>
+      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.6</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
+      <div class="release-hero"><span>0.1.6</span><div><strong>可靠麦克风测试与会后参会人匹配</strong><small>2026-08-31 · Feature update</small></div></div>
       <div class="release-list">
+        <article><span>NEW</span><div><h3>会后匹配参会人</h3><p>纪要编辑页可根据样例发言确认说话人 1、2…的姓名，保存后同步更新完整转写和纪要中的说话人标签。</p></div></article>
+        <article><span>FIXED</span><div><h3>恢复明确的系统默认麦克风</h3><p>麦克风列表分为“自动选择”和“固定设备”，系统默认项始终置顶，并明确说明会跟随 Windows 及耳机插拔自动切换。</p></div></article>
+        <article><span>FIXED</span><div><h3>增强麦克风实时耳返</h3><p>测试改用稳定的阻塞读取链路，优先回放到 Windows 当前默认输出，并增加适度增益与实时音量条。</p></div></article>
         <article><span>NEW</span><div><h3>实时测试当前麦克风</h3><p>说话声会低延迟回放到当前默认耳机或扬声器，并明确显示测试使用的输入与播放设备。</p></div></article>
         <article><span>FIXED</span><div><h3>正确打开自定义输出目录</h3><p>Windows 资源管理器会直接进入设置中保存的目录，不再错误停留在 Documents 父级。</p></div></article>
         <article><span>FIXED</span><div><h3>恢复默认麦克风人声</h3><p>直接跟随 Windows WASAPI 默认输入，并按麦克风原生声道格式录制，避免误用旧端点导致静音。</p></div></article>
@@ -326,6 +333,16 @@
       <div class="setup-visual"><span><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></span><div><strong>BlackHole 2ch</strong><small>开源 · 约 100 KB · 随应用内置</small></div></div>
       <p class="setup-copy">它负责把会议播放的声音送进录音程序，不会读取其他文件，也不会自行上传数据。安装时系统会要求输入开机密码。</p>
       <div class="modal-foot"><button class="button secondary" id="btnSetupLater" type="button">稍后再说</button><button class="button primary" id="btnSetupInstall" type="button">安装并开始录音</button></div>
+    </section>
+  </div>
+
+  <div class="overlay hidden" id="speakerOverlay" role="dialog" aria-modal="true" aria-labelledby="speakerTitle">
+    <section class="modal speaker-modal">
+      <div class="modal-head"><div><span class="eyebrow simple">SPEAKER MATCHING</span><h2 id="speakerTitle">匹配参会人</h2><p>根据样例发言，确认“说话人 1、2…”分别是谁。</p></div><button class="modal-close" data-close="speakerOverlay" type="button">×</button></div>
+      <div class="speaker-map-intro"><strong>匹配结果会保存到本场会议</strong><span>保存后会更新完整转写，并替换当前纪要中仍存在的“说话人N”标签；其他纪要内容不会重新生成。</span></div>
+      <div class="speaker-map-rows" id="speakerMapRows"></div>
+      <datalist id="speakerCandidates"></datalist>
+      <div class="modal-foot"><button class="button secondary" data-close="speakerOverlay" type="button">取消</button><button class="button primary" id="btnSaveSpeakerMapping" type="button">保存并应用</button></div>
     </section>
   </div>
 

@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 import numpy as np
@@ -74,6 +75,59 @@ def test_minutes_metadata_and_recent_sessions(tmp_path, monkeypatch):
     assert detail["mtime"].startswith("20")
     assert recent["sessions"][0]["minutes"] == str(minutes)
     assert recent["sessions"][0]["transcript"] == str(transcript)
+
+
+def test_speaker_mapping_uses_samples_and_regenerates_transcript(tmp_path, monkeypatch):
+    session = tmp_path / "2026-08-31_0900_复盘会"
+    session.mkdir()
+    minutes = session / server.pipeline_mod.MINUTES_MD
+    transcript_json = session / server.pipeline_mod.TRANSCRIPT_JSON
+    transcript_md = session / server.pipeline_mod.TRANSCRIPT_MD
+    minutes.write_text("# 复盘会\n\n- 说话人1确认上线\n- 说话人2负责验收\n", encoding="utf-8")
+    transcript_json.write_text(json.dumps({
+        "sentences": [
+            {"begin_ms": 0, "end_ms": 1000, "text": "我来确认上线。", "speaker_id": 0},
+            {"begin_ms": 1200, "end_ms": 2200, "text": "我负责验收。", "speaker_id": 1},
+        ],
+    }, ensure_ascii=False), encoding="utf-8")
+    transcript_md.write_text("旧转写", encoding="utf-8")
+    monkeypatch.setattr(server._state, "cfg", Config(output_dir=str(tmp_path)))
+    monkeypatch.setattr(server._state, "meeting_attendees", ["张三", "李四"])
+    monkeypatch.setattr(server._state, "session_dir", session)
+
+    detail = server.Api().get_speaker_mapping(str(minutes))
+    saved = server.Api().save_speaker_mapping(str(minutes), {"1": "张三", "2": "李四"})
+
+    assert detail["ok"] is True
+    assert detail["speakers"] == [
+        {"number": 1, "label": "说话人1", "sample": "我来确认上线。"},
+        {"number": 2, "label": "说话人2", "sample": "我负责验收。"},
+    ]
+    assert detail["candidates"] == ["张三", "李四"]
+    assert saved["ok"] is True
+    assert saved["mapping"] == {"1": "张三", "2": "李四"}
+    assert "**张三**" in transcript_md.read_text(encoding="utf-8")
+    assert "**李四**" in transcript_md.read_text(encoding="utf-8")
+    stored = json.loads((session / server.pipeline_mod.SPEAKER_MAP_JSON).read_text(encoding="utf-8"))
+    assert stored["speakers"] == {"1": "张三", "2": "李四"}
+    # 后端不重写用户纪要正文；前端仅替换仍存在的“说话人N”标签后再正常保存。
+    assert "说话人1" in minutes.read_text(encoding="utf-8")
+
+
+def test_speaker_mapping_rejects_unknown_speaker(tmp_path, monkeypatch):
+    session = tmp_path / "2026-08-31_1000"
+    session.mkdir()
+    minutes = session / server.pipeline_mod.MINUTES_MD
+    minutes.write_text("# 测试", encoding="utf-8")
+    (session / server.pipeline_mod.TRANSCRIPT_JSON).write_text(json.dumps({
+        "sentences": [{"begin_ms": 0, "end_ms": 1, "text": "你好", "speaker_id": 0}],
+    }), encoding="utf-8")
+    monkeypatch.setattr(server._state, "cfg", Config(output_dir=str(tmp_path)))
+
+    result = server.Api().save_speaker_mapping(str(minutes), {"3": "不存在"})
+
+    assert result["ok"] is False
+    assert "不存在说话人3" in result["error"]
 
 
 def test_status_includes_application_version():
@@ -168,6 +222,7 @@ class _FakeMicMonitor:
         self.last_error = None
         self.input_name = "USB Headset Mic"
         self.output_name = "USB Headset"
+        self.level = 0.42
         self.stopped = False
 
     def start(self):
@@ -193,5 +248,6 @@ def test_mic_test_lifecycle_is_exposed_in_status(monkeypatch):
     assert status["mic_test_active"] is True
     assert status["mic_test_input"] == "USB Headset Mic"
     assert status["mic_test_output"] == "USB Headset"
+    assert status["mic_test_level"] == 0.42
     assert stopped["ok"] is True
     assert monitor.stopped is True

@@ -21,7 +21,7 @@ def test_home_contains_guide_changelog_and_version():
 
     assert 'id="guideOverlay"' in html
     assert 'id="changelogOverlay"' in html
-    assert "v0.1.5" in html
+    assert "v0.1.6" in html
     assert 'data-view-panel="minutes"' in html
 
 
@@ -72,9 +72,25 @@ def test_windows_microphone_test_and_default_device_label_are_wired():
 
     assert 'id="btnMicTest"' in html
     assert 'id="micTestStatus"' in html
+    assert 'id="micTestLevel"' in html
     assert "start_mic_test" in javascript
     assert "stop_mic_test" in javascript
-    assert "跟随 Windows 默认（当前：" in javascript
+    assert "系统默认（推荐，当前：" in javascript
+    assert 'automaticGroup.label = "自动选择"' in javascript
+    assert 'deviceGroup.label = "固定设备"' in javascript
+    assert ".filter((name) => name !== defaultMicrophone" not in javascript
+
+
+def test_minutes_editor_exposes_post_meeting_speaker_mapping():
+    html = (WEBUI / "index.html").read_text(encoding="utf-8")
+    javascript = (WEBUI / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="btnSpeakerMapping"' in html
+    assert 'id="speakerOverlay"' in html
+    assert 'id="speakerMapRows"' in html
+    assert "get_speaker_mapping" in javascript
+    assert "save_speaker_mapping" in javascript
+    assert "replaceSpeakerLabels" in javascript
 
 
 def test_packaging_includes_all_webui_assets():
@@ -109,12 +125,12 @@ def test_release_builds_embed_version_metadata():
     assert '--version-file assets\\version_info.txt' in workflow
     assert '--version-file assets\\version_info.txt' in windows_script
     for content in (workflow, macos_script):
-        assert "Set :CFBundleShortVersionString 0.1.5" in content
-        assert "Set :CFBundleVersion 0.1.5" in content
-    assert "filevers=(0, 1, 5, 0)" in windows_version
-    assert "prodvers=(0, 1, 5, 0)" in windows_version
-    assert "StringStruct('FileVersion', '0.1.5')" in windows_version
-    assert "StringStruct('ProductVersion', '0.1.5')" in windows_version
+        assert "Set :CFBundleShortVersionString 0.1.6" in content
+        assert "Set :CFBundleVersion 0.1.6" in content
+    assert "filevers=(0, 1, 6, 0)" in windows_version
+    assert "prodvers=(0, 1, 6, 0)" in windows_version
+    assert "StringStruct('FileVersion', '0.1.6')" in windows_version
+    assert "StringStruct('ProductVersion', '0.1.6')" in windows_version
 
 
 def test_windows_release_uses_native_certificate_store():

@@ -5,6 +5,7 @@
     audio.wav          提交转写的 16k 单声道音频（导入模式下为原始文件的副本）
     transcript.json    归一化转写结果（带 speaker_id）
     transcript.md      带时间戳/说话人标签的可读转写稿
+    speaker_map.json   用户后期确认的说话人与参会人姓名映射
     会议纪要.md         最终纪要
 """
 
@@ -26,6 +27,7 @@ Progress = Callable[[str, str], None]
 AUDIO_WAV = "audio.wav"
 TRANSCRIPT_JSON = "transcript.json"
 TRANSCRIPT_MD = "transcript.md"
+SPEAKER_MAP_JSON = "speaker_map.json"
 MINUTES_MD = "会议纪要.md"
 
 
@@ -84,6 +86,7 @@ def run_pipeline(
 
     session_dir = session_dir or new_session_dir(cfg.resolved_output_dir(), title)
     started_at = started_at or datetime.now()
+    meeting_attendees = attendees if attendees is not None else cfg.attendees
 
     audio_path = prepare_audio(input_path, session_dir, progress)
 
@@ -116,7 +119,7 @@ def run_pipeline(
             transcript_md,
             api_key=api_key,
             model=cfg.llm_model,
-            attendees=attendees if attendees is not None else cfg.attendees,
+            attendees=meeting_attendees,
             meeting_title=title,
             started_at=started_at,
             base_url=cfg.llm_base_url(),
@@ -125,6 +128,24 @@ def run_pipeline(
         minutes_path.write_text(minutes, encoding="utf-8")
     elif progress:
         progress("minutes", "发现已有纪要，跳过生成。")
+
+    clean_candidates = []
+    for attendee in meeting_attendees:
+        name = " ".join(str(attendee).split())
+        if name and name not in clean_candidates:
+            clean_candidates.append(name)
+    if clean_candidates:
+        mapping_path = session_dir / SPEAKER_MAP_JSON
+        mapping_payload = {"version": 1, "speakers": {}}
+        if mapping_path.exists():
+            stored = json.loads(mapping_path.read_text(encoding="utf-8"))
+            if isinstance(stored, dict):
+                mapping_payload.update(stored)
+        mapping_payload["candidates"] = clean_candidates
+        mapping_path.write_text(
+            json.dumps(mapping_payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
 
     (session_dir / "done.flag").write_text("ok", encoding="utf-8")
     return minutes_path
