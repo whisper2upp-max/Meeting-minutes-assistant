@@ -16,6 +16,7 @@ const state = {
   logCount: 0,
   handledResult: null,
   pendingDeleteSession: null,
+  speakerMapping: {},
   toastTimer: null,
 };
 
@@ -212,6 +213,9 @@ function renderRecorder(status) {
     : status.mic_test_error
       ? status.mic_test_error
       : "说话声会实时送到当前默认耳机或扬声器；使用扬声器时请降低音量，避免啸叫。";
+  const micLevel = Math.max(0, Math.min(1, Number(status.mic_test_level) || 0));
+  $("micTestLevel").style.width = `${Math.round(micLevel * 100)}%`;
+  $("micTestLevel").parentElement.setAttribute("aria-valuenow", String(Math.round(micLevel * 100)));
   // Windows 的会议内声固定来自默认输出设备：保持字段可见，但不让用户误以为需要选择。
   $("systemSelect").disabled = busy || Boolean(status.is_windows);
   $("btnStartImport").disabled = busy || !state.importPath;
@@ -276,13 +280,21 @@ async function loadDevices() {
     const sources = result.devices?.system_sources || [];
     const isWindows = Boolean(status.is_windows);
     const defaultMicrophone = result.devices?.default_microphone || "";
-    const defaultLabel = isWindows && defaultMicrophone
-      ? `跟随 Windows 默认（当前：${defaultMicrophone}）`
+    const defaultLabel = isWindows
+      ? defaultMicrophone
+        ? `系统默认（推荐，当前：${defaultMicrophone}）`
+        : "系统默认（推荐，自动跟随 Windows）"
       : "系统默认麦克风";
-    $("micSelect").replaceChildren(new Option(defaultLabel, "", false, !config.microphone));
-    microphones
-      .filter((name) => name !== defaultMicrophone || config.microphone === name)
-      .forEach((name) => $("micSelect").add(new Option(name, name, false, config.microphone === name)));
+    const automaticGroup = document.createElement("optgroup");
+    automaticGroup.label = "自动选择";
+    automaticGroup.append(new Option(defaultLabel, "", false, !config.microphone));
+    const deviceGroup = document.createElement("optgroup");
+    deviceGroup.label = "固定设备";
+    microphones.forEach((name) => {
+      const label = isWindows && name === defaultMicrophone ? `${name}（当前默认设备）` : name;
+      deviceGroup.append(new Option(label, name, false, config.microphone === name));
+    });
+    $("micSelect").replaceChildren(automaticGroup, deviceGroup);
     $("systemSelect").replaceChildren(new Option(
       isWindows ? "系统默认输出设备（WASAPI 自动内录）" : "自动检测 BlackHole",
       "",
@@ -587,6 +599,7 @@ function setEditorEnabled(enabled) {
   $("btnSaveMinutes").disabled = !enabled || !state.dirty;
   ["btnExport", "btnOpenFolder"].forEach((id) => { $(id).disabled = !enabled; });
   $("btnTranscript").disabled = !enabled || !state.transcriptPath;
+  $("btnSpeakerMapping").disabled = !enabled;
   updateTableControls();
 }
 
@@ -614,6 +627,7 @@ function markSaved(message = "已保存到本机") {
 function clearEditor() {
   state.activeMinutes = null;
   state.transcriptPath = null;
+  state.speakerMapping = {};
   state.dirty = false;
   $("minutesBody").classList.add("empty");
   $("minutesBody").innerHTML = '<div class="editor-empty"><span><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/></svg></span><strong>选择左侧会议纪要</strong><small>这里可以直接编辑标题、段落、列表和行动项表格。</small></div>';
@@ -624,6 +638,95 @@ function clearEditor() {
   $("saveState").className = "save-state";
   $("saveState").innerHTML = "<i></i> 未选择纪要";
   setEditorEnabled(false);
+}
+
+function replaceSpeakerLabels(mapping) {
+  const numbers = Object.keys(mapping || {})
+    .filter((number) => /^\d+$/.test(number) && String(mapping[number] || "").trim())
+    .sort((left, right) => Number(right) - Number(left));
+  if (!numbers.length) return false;
+  const pattern = new RegExp(`说话人(${numbers.join("|")})(?!\\d)`, "g");
+  const walker = document.createTreeWalker($("minutesBody"), NodeFilter.SHOW_TEXT);
+  let changed = false;
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const next = node.nodeValue.replace(pattern, (whole, number) => mapping[number] || whole);
+    if (next !== node.nodeValue) {
+      node.nodeValue = next;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+async function openSpeakerMapping() {
+  if (!state.activeMinutes || !state.apiReady) return toast("请先选择一份会议纪要");
+  const result = await api().get_speaker_mapping(state.activeMinutes);
+  if (!result.ok) return toast(result.error || "无法读取说话人信息");
+  state.speakerMapping = result.mapping || {};
+
+  const candidates = $("speakerCandidates");
+  candidates.replaceChildren();
+  (result.candidates || []).forEach((name) => candidates.append(new Option(name, name)));
+
+  const rows = $("speakerMapRows");
+  rows.replaceChildren();
+  (result.speakers || []).forEach((speaker) => {
+    const row = document.createElement("div");
+    const label = document.createElement("div");
+    const title = document.createElement("strong");
+    const status = document.createElement("small");
+    const sample = document.createElement("p");
+    const input = document.createElement("input");
+    row.className = "speaker-map-row";
+    label.className = "speaker-map-label";
+    sample.className = "speaker-map-sample";
+    title.textContent = speaker.label || `说话人${speaker.number}`;
+    status.textContent = state.speakerMapping[String(speaker.number)] ? "已匹配" : "待确认";
+    sample.textContent = speaker.sample || "没有可展示的发言样例";
+    input.type = "text";
+    input.maxLength = 40;
+    input.placeholder = "输入参会人姓名";
+    input.setAttribute("list", "speakerCandidates");
+    input.dataset.speakerNumber = String(speaker.number);
+    input.value = state.speakerMapping[String(speaker.number)] || "";
+    label.append(title, status);
+    row.append(label, sample, input);
+    rows.appendChild(row);
+  });
+  if (!(result.speakers || []).length) {
+    rows.innerHTML = '<div class="speaker-map-empty">这场会议没有识别到可匹配的说话人标签。</div>';
+  }
+  $("btnSaveSpeakerMapping").disabled = !(result.speakers || []).length;
+  openOverlay("speakerOverlay");
+}
+
+async function saveSpeakerMapping() {
+  if (!state.activeMinutes || !state.apiReady) return;
+  const button = $("btnSaveSpeakerMapping");
+  const mapping = {};
+  qa("input[data-speaker-number]", $("speakerMapRows")).forEach((input) => {
+    const name = input.value.trim();
+    if (name) mapping[input.dataset.speakerNumber] = name;
+  });
+  button.disabled = true;
+  button.textContent = "正在保存…";
+  try {
+    const result = await api().save_speaker_mapping(state.activeMinutes, mapping);
+    if (!result.ok) return toast(result.error || "无法保存说话人匹配");
+    state.speakerMapping = result.mapping || {};
+    if (result.transcript) state.transcriptPath = result.transcript;
+    const changed = replaceSpeakerLabels(state.speakerMapping);
+    if (changed) {
+      markDirty();
+      if (!await saveMinutes()) return;
+    }
+    closeOverlay("speakerOverlay");
+    toast(changed ? "参会人已匹配，转写与纪要均已更新" : "参会人匹配已保存，完整转写已更新");
+  } finally {
+    button.disabled = false;
+    button.textContent = "保存并应用";
+  }
 }
 
 async function openMinutes(path) {
@@ -647,14 +750,18 @@ async function openMinutes(path) {
 }
 
 async function saveMinutes() {
-  if (!state.activeMinutes || !state.apiReady) return;
+  if (!state.activeMinutes || !state.apiReady) return false;
   const markdown = editorToMarkdown($("minutesBody"));
   const result = await api().save_minutes(state.activeMinutes, markdown);
-  if (!result.ok) return toast(result.error);
+  if (!result.ok) {
+    toast(result.error);
+    return false;
+  }
   $("minutesBody").innerHTML = markdownToHtml(markdown);
   markSaved();
   toast("纪要已保存");
   await loadSessions();
+  return true;
 }
 
 async function exportMinutes() {
@@ -879,6 +986,8 @@ function bindEvents() {
   $("minutesBody").addEventListener("click", updateTableControls);
   $("minutesBody").addEventListener("keyup", updateTableControls);
   $("btnSaveMinutes").addEventListener("click", saveMinutes);
+  $("btnSpeakerMapping").addEventListener("click", openSpeakerMapping);
+  $("btnSaveSpeakerMapping").addEventListener("click", saveSpeakerMapping);
   $("btnExport").addEventListener("click", exportMinutes);
   $("btnOpenFolder").addEventListener("click", () => state.activeMinutes && api().reveal(state.activeMinutes));
   $("btnTranscript").addEventListener("click", () => state.transcriptPath && api().open_file(state.transcriptPath));

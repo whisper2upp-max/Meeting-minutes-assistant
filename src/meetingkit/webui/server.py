@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -20,6 +22,7 @@ import webview
 from .. import __version__
 from .. import audio as audio_mod
 from .. import pipeline as pipeline_mod
+from ..cloud import transcribe as transcribe_mod
 from ..config import Config, load_config, save_config
 
 IS_WINDOWS = sys.platform == "win32"
@@ -102,6 +105,7 @@ class UiState:
             "mic_test_error": mic_test_error,
             "mic_test_input": mic_monitor.input_name if mic_monitor else "",
             "mic_test_output": mic_monitor.output_name if mic_monitor else "",
+            "mic_test_level": float(getattr(mic_monitor, "level", 0.0)) if mic_monitor else 0.0,
             "loopback_ready": loopback_ready,
             "version": __version__,
             "config": {
@@ -429,6 +433,163 @@ class Api:
             }
         except Exception as exc:
             return {"ok": False, "error": f"{exc}"}
+
+    def _speaker_context(
+        self,
+        minutes: Path,
+    ) -> tuple[list[dict], dict[str, str], list[str]]:
+        """读取一场会议可映射的说话人、样例发言和已保存映射。"""
+        session = minutes.parent
+        transcript_json = session / pipeline_mod.TRANSCRIPT_JSON
+        transcript_md = session / pipeline_mod.TRANSCRIPT_MD
+        sentences: list[dict] = []
+        if transcript_json.exists():
+            payload = json.loads(transcript_json.read_text(encoding="utf-8"))
+            sentences = payload.get("sentences", []) if isinstance(payload, dict) else []
+
+        samples: dict[int, list[str]] = {}
+        for sentence in sentences:
+            if not isinstance(sentence, dict):
+                continue
+            try:
+                speaker_id = int(sentence.get("speaker_id", -1))
+            except (TypeError, ValueError):
+                continue
+            text = " ".join(str(sentence.get("text", "")).split())
+            if speaker_id < 0 or not text:
+                continue
+            bucket = samples.setdefault(speaker_id + 1, [])
+            if len(bucket) < 2:
+                bucket.append(text)
+
+        # 极少数旧会话可能只保留 transcript.md，仍允许用户完成姓名匹配。
+        if not samples and transcript_md.exists():
+            content = transcript_md.read_text(encoding="utf-8")
+            pattern = re.compile(r"\*\*说话人(\d+)\*\*[：:]\s*([^\n]+)")
+            for number_text, text in pattern.findall(content):
+                number = int(number_text)
+                bucket = samples.setdefault(number, [])
+                if len(bucket) < 2:
+                    bucket.append(" ".join(text.split()))
+
+        mapping_path = session / pipeline_mod.SPEAKER_MAP_JSON
+        mapping: dict[str, str] = {}
+        stored_candidates: list[str] = []
+        if mapping_path.exists():
+            stored = json.loads(mapping_path.read_text(encoding="utf-8"))
+            raw_mapping = stored.get("speakers", {}) if isinstance(stored, dict) else {}
+            if isinstance(raw_mapping, dict):
+                mapping = {
+                    str(key): str(value).strip()
+                    for key, value in raw_mapping.items()
+                    if str(value).strip()
+                }
+            raw_candidates = stored.get("candidates", []) if isinstance(stored, dict) else []
+            if isinstance(raw_candidates, list):
+                for value in raw_candidates:
+                    name = " ".join(str(value).split())
+                    if name and name not in stored_candidates:
+                        stored_candidates.append(name)
+
+        speakers = [
+            {
+                "number": number,
+                "label": f"说话人{number}",
+                "sample": " / ".join(parts)[:180],
+            }
+            for number, parts in sorted(samples.items())
+        ]
+        return speakers, mapping, stored_candidates
+
+    def get_speaker_mapping(self, path: str) -> dict:
+        try:
+            minutes = self._safe_minutes_path(path)
+            if minutes.name != pipeline_mod.MINUTES_MD or not minutes.is_file():
+                raise RuntimeError("会议纪要文件不存在")
+            speakers, mapping, stored_candidates = self._speaker_context(minutes)
+            candidates = []
+            with _state.lock:
+                active_session = _state.session_dir.resolve() if _state.session_dir else None
+                attendee_candidates = (
+                    list(_state.meeting_attendees)
+                    if active_session == minutes.parent.resolve()
+                    else []
+                )
+            for name in [
+                *stored_candidates,
+                *attendee_candidates,
+                *_state.cfg.attendees,
+                *mapping.values(),
+            ]:
+                clean = " ".join(str(name).split())
+                if clean and clean not in candidates:
+                    candidates.append(clean)
+            return {
+                "ok": True,
+                "speakers": speakers,
+                "mapping": mapping,
+                "candidates": candidates,
+            }
+        except Exception as exc:
+            return {"ok": False, "error": f"读取说话人信息失败：{exc}"}
+
+    def save_speaker_mapping(self, path: str, mapping: dict) -> dict:
+        """保存用户确认的姓名映射，并据原始 JSON 重新生成可读转写稿。"""
+        try:
+            minutes = self._safe_minutes_path(path)
+            if minutes.name != pipeline_mod.MINUTES_MD or not minutes.is_file():
+                raise RuntimeError("会议纪要文件不存在")
+            speakers, _, stored_candidates = self._speaker_context(minutes)
+            valid_numbers = {item["number"] for item in speakers}
+            if not valid_numbers:
+                raise RuntimeError("这场会议没有可匹配的说话人标签")
+            if not isinstance(mapping, dict):
+                raise RuntimeError("说话人映射格式无效")
+
+            cleaned: dict[str, str] = {}
+            for key, value in mapping.items():
+                try:
+                    number = int(key)
+                except (TypeError, ValueError):
+                    raise RuntimeError(f"无效的说话人编号：{key}") from None
+                if number not in valid_numbers:
+                    raise RuntimeError(f"转写稿中不存在说话人{number}")
+                name = " ".join(str(value).split())
+                if len(name) > 40:
+                    raise RuntimeError(f"说话人{number}的姓名过长")
+                if name:
+                    cleaned[str(number)] = name
+
+            mapping_path = minutes.parent / pipeline_mod.SPEAKER_MAP_JSON
+            mapping_payload = {"version": 1, "speakers": cleaned}
+            if stored_candidates:
+                mapping_payload["candidates"] = stored_candidates
+            mapping_path.write_text(
+                json.dumps(mapping_payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            transcript_json = minutes.parent / pipeline_mod.TRANSCRIPT_JSON
+            transcript_md = minutes.parent / pipeline_mod.TRANSCRIPT_MD
+            if transcript_json.exists():
+                payload = json.loads(transcript_json.read_text(encoding="utf-8"))
+                sentences = payload.get("sentences", []) if isinstance(payload, dict) else []
+                names_by_id = {int(number) - 1: name for number, name in cleaned.items()}
+                transcript_md.write_text(
+                    transcribe_mod.format_transcript_md(sentences, names_by_id),
+                    encoding="utf-8",
+                )
+
+            _state.log(
+                f"说话人匹配已保存：{len(cleaned)}/{len(valid_numbers)} 位参会人"
+            )
+            return {
+                "ok": True,
+                "mapping": cleaned,
+                "transcript": str(transcript_md) if transcript_md.exists() else "",
+            }
+        except Exception as exc:
+            return {"ok": False, "error": f"保存说话人匹配失败：{exc}"}
 
     def save_minutes(self, path: str, content: str) -> dict:
         try:

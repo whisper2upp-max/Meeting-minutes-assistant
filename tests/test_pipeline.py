@@ -6,9 +6,9 @@ import numpy as np
 
 from meetingkit.audio.base import write_wav_mono
 from meetingkit.config import Config
-from meetingkit.pipeline import (AUDIO_WAV, MINUTES_MD, TRANSCRIPT_JSON,
-                                 TRANSCRIPT_MD, new_session_dir, prepare_audio,
-                                 run_pipeline)
+from meetingkit.pipeline import (AUDIO_WAV, MINUTES_MD, SPEAKER_MAP_JSON,
+                                 TRANSCRIPT_JSON, TRANSCRIPT_MD,
+                                 new_session_dir, prepare_audio, run_pipeline)
 
 
 def _make_wav(path: Path, seconds: float = 1.0, sr: int = 48000):
@@ -82,6 +82,8 @@ def test_run_pipeline_full_and_cache(tmp_path, monkeypatch):
     assert (session / AUDIO_WAV).exists()
     assert (session / TRANSCRIPT_JSON).exists()
     assert (session / TRANSCRIPT_MD).exists()
+    speaker_meta = json.loads((session / SPEAKER_MAP_JSON).read_text(encoding="utf-8"))
+    assert speaker_meta == {"version": 1, "speakers": {}, "candidates": ["张三"]}
     tmd = (session / TRANSCRIPT_MD).read_text(encoding="utf-8")
     assert "说话人1" in tmd and "说话人2" in tmd
     # 同一说话人连续发言被合并

@@ -14,7 +14,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Mapping, Optional
 
 import requests
 
@@ -215,8 +215,12 @@ def _parse_sentences(detail: dict) -> List[dict]:
     return sentences
 
 
-def format_transcript_md(sentences: List[dict]) -> str:
-    """把归一化转写结果排版成带时间戳和说话人标签的 Markdown。"""
+def format_transcript_md(
+    sentences: List[dict],
+    speaker_names: Optional[Mapping[int, str]] = None,
+) -> str:
+    """把转写结果排版为 Markdown，可使用用户确认后的说话人姓名。"""
+    speaker_names = speaker_names or {}
     has_speaker = any(s["speaker_id"] >= 0 for s in sentences)
     lines: List[str] = []
     last_speaker = None
@@ -228,7 +232,8 @@ def format_transcript_md(sentences: List[dict]) -> str:
                 lines[-1] = lines[-1].rstrip() + s["text"]
                 continue
             last_speaker = spk
-            lines.append(f"`[{ts}]` **说话人{spk + 1}**：{s['text']}")
+            label = speaker_names.get(spk) or f"说话人{spk + 1}"
+            lines.append(f"`[{ts}]` **{label}**：{s['text']}")
         else:
             lines.append(f"`[{ts}]` {s['text']}")
     return "\n\n".join(lines) + "\n"
