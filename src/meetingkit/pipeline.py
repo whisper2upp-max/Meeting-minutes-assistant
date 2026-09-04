@@ -6,12 +6,14 @@
     transcript.json    归一化转写结果（带 speaker_id）
     transcript.md      带时间戳/说话人标签的可读转写稿
     speaker_map.json   用户后期确认的说话人与参会人姓名映射
+    session.json       会议标题、参会人、纪要详细程度与生成模型
     会议纪要.md         最终纪要
 """
 
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +23,7 @@ from .audio.base import read_wav_mono, resample, rms_normalize, write_wav_mono, 
 from .cloud import transcribe as transcribe_mod
 from .cloud import llm as llm_mod
 from .config import Config
+from .prompt import DEFAULT_DETAIL_LEVEL, normalize_detail_level
 
 Progress = Callable[[str, str], None]
 
@@ -28,7 +31,69 @@ AUDIO_WAV = "audio.wav"
 TRANSCRIPT_JSON = "transcript.json"
 TRANSCRIPT_MD = "transcript.md"
 SPEAKER_MAP_JSON = "speaker_map.json"
+SESSION_META_JSON = "session.json"
 MINUTES_MD = "会议纪要.md"
+MINUTES_HISTORY_DIR = "纪要历史版本"
+
+
+def clean_attendees(values) -> list[str]:
+    """清理并去重参会人姓名，同时保持用户输入顺序。"""
+    if isinstance(values, str):
+        values = re.split(r"[\n,，;；]+", values)
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for value in values or []:
+        name = " ".join(str(value).split())[:40]
+        key = name.casefold()
+        if name and key not in seen:
+            cleaned.append(name)
+            seen.add(key)
+    return cleaned
+
+
+def load_session_metadata(session_dir: Path) -> dict:
+    """读取会议元数据；v0.1.6 及更早会话安全回退到简要档。"""
+    path = Path(session_dir) / SESSION_META_JSON
+    payload: dict = {}
+    if path.exists():
+        try:
+            stored = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(stored, dict):
+                payload = stored
+        except (OSError, json.JSONDecodeError):
+            payload = {}
+    return {
+        **payload,
+        "version": 1,
+        "title": str(payload.get("title", "") or "").strip(),
+        "started_at": str(payload.get("started_at", "") or "").strip(),
+        "attendees": clean_attendees(payload.get("attendees", [])),
+        "detail_level": normalize_detail_level(payload.get("detail_level", "")),
+        "minutes_model": str(payload.get("minutes_model", "") or "").strip(),
+    }
+
+
+def save_session_metadata(session_dir: Path, **changes) -> Path:
+    """合并写入会议元数据，采用临时文件替换避免中途留下半份 JSON。"""
+    session_dir = Path(session_dir)
+    session_dir.mkdir(parents=True, exist_ok=True)
+    payload = load_session_metadata(session_dir)
+    payload.update(changes)
+    payload["version"] = 1
+    payload["title"] = str(payload.get("title", "") or "").strip()
+    payload["started_at"] = str(payload.get("started_at", "") or "").strip()
+    payload["attendees"] = clean_attendees(payload.get("attendees", []))
+    payload["detail_level"] = normalize_detail_level(payload.get("detail_level", ""))
+    payload["minutes_model"] = str(payload.get("minutes_model", "") or "").strip()
+    payload["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    path = session_dir / SESSION_META_JSON
+    temporary = session_dir / f".{SESSION_META_JSON}.tmp"
+    temporary.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+    return path
 
 
 def new_session_dir(output_dir: Path, title: str = "") -> Path:
@@ -75,6 +140,7 @@ def run_pipeline(
     transcribe_fn=transcribe_mod.transcribe_file,
     minutes_fn=llm_mod.generate_minutes,
     attendees: Optional[list] = None,
+    detail_level: str = DEFAULT_DETAIL_LEVEL,
 ) -> Path:
     """完整处理一个音频文件，返回纪要文件路径。已完成的步骤自动跳过。
 
@@ -86,7 +152,17 @@ def run_pipeline(
 
     session_dir = session_dir or new_session_dir(cfg.resolved_output_dir(), title)
     started_at = started_at or datetime.now()
-    meeting_attendees = attendees if attendees is not None else cfg.attendees
+    meeting_attendees = clean_attendees(attendees if attendees is not None else cfg.attendees)
+    detail_level = normalize_detail_level(detail_level)
+    minutes_model = llm_mod.resolve_minutes_model(cfg.llm_model, detail_level)
+    save_session_metadata(
+        session_dir,
+        title=title,
+        started_at=started_at.isoformat(timespec="seconds"),
+        attendees=meeting_attendees,
+        detail_level=detail_level,
+        minutes_model=minutes_model,
+    )
 
     audio_path = prepare_audio(input_path, session_dir, progress)
 
@@ -122,6 +198,7 @@ def run_pipeline(
             attendees=meeting_attendees,
             meeting_title=title,
             started_at=started_at,
+            detail_level=detail_level,
             base_url=cfg.llm_base_url(),
             progress=progress,
         )
@@ -129,11 +206,7 @@ def run_pipeline(
     elif progress:
         progress("minutes", "发现已有纪要，跳过生成。")
 
-    clean_candidates = []
-    for attendee in meeting_attendees:
-        name = " ".join(str(attendee).split())
-        if name and name not in clean_candidates:
-            clean_candidates.append(name)
+    clean_candidates = clean_attendees(meeting_attendees)
     if clean_candidates:
         mapping_path = session_dir / SPEAKER_MAP_JSON
         mapping_payload = {"version": 1, "speakers": {}}

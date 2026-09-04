@@ -29,7 +29,7 @@
       <button class="status-chip" id="statusChip" type="button">
         <span class="status-dot"></span><span id="statusText">本机就绪</span>
       </button>
-      <span class="version-chip" id="versionChip">v0.1.6</span>
+      <span class="version-chip" id="versionChip">v0.1.7</span>
       <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
         <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
       </button>
@@ -114,7 +114,7 @@
         <button class="shortcut-card release" id="btnChangelog" type="button">
           <span class="shortcut-index">04</span>
           <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
-          <strong>更新日志</strong><small>v0.1.6 · 默认麦克风、可靠耳返与参会人匹配</small><i>查看变化 →</i>
+          <strong>更新日志</strong><small>v0.1.7 · 三档纪要与可视化参会人</small><i>查看变化 →</i>
         </button>
       </div>
 
@@ -138,7 +138,23 @@
         <section class="surface setup-card">
           <div class="surface-title"><span>01</span><div><h2>会议设置</h2><p>用于命名输出与识别参会人</p></div></div>
           <div class="field"><label for="titleInput">会议标题 <small>可选</small></label><input id="titleInput" maxlength="40" placeholder="例如：新版上线同步会"></div>
-          <div class="field"><label for="attendeesRec">参会人 <small>每行一个</small></label><textarea id="attendeesRec" rows="4" placeholder="张三&#10;李四"></textarea><p>参会人会作为说话人姓名候选，不会保存到全局设置。</p></div>
+          <div class="field attendee-field">
+            <label for="attendeesRecInput">参会人 <small>可选</small></label>
+            <div class="attendee-editor" data-attendee-editor="record">
+              <div class="attendee-chips" id="attendeesRecChips"><span class="attendee-empty">还没有添加参会人</span></div>
+              <div class="attendee-entry"><input id="attendeesRecInput" maxlength="1000" placeholder="输入姓名，按 Enter 添加"><button type="button" data-add-attendee="record">添加</button></div>
+            </div>
+            <div class="attendee-suggestions" id="attendeesRecSuggestions"></div>
+            <p>支持一次粘贴多行姓名；常用参会人可在设置中维护。</p>
+          </div>
+          <div class="field detail-field">
+            <label>纪要详细程度 <small>生成后仍可调整</small></label>
+            <div class="detail-picker" id="detailRec" role="radiogroup" aria-label="录制会议纪要详细程度">
+              <label><input type="radio" name="detailRec" value="brief" checked><i>01</i><span><b>简要</b><small>结论优先</small></span></label>
+              <label><input type="radio" name="detailRec" value="standard"><i>02</i><span><b>标准</b><small>背景与观点</small></span></label>
+              <label><input type="radio" name="detailRec" value="detailed"><i>03</i><span><b>详细</b><small>完整脉络 · 增强模型</small></span></label>
+            </div>
+          </div>
           <div class="field" id="systemField"><label for="systemSelect">会议内声</label><select id="systemSelect"><option value="">正在检测系统声源…</option></select></div>
           <div class="field">
             <label for="micSelect">麦克风 <button class="inline-button" id="btnRefresh" type="button">刷新设备</button></label>
@@ -188,7 +204,22 @@
             <small>WAV、MP3、M4A、FLAC、MP4、MOV 等</small>
           </button>
           <div class="chosen-file hidden" id="chosenFile"><span class="file-badge">AUDIO</span><div><strong id="importFileName"></strong><small id="importFilePath"></small></div></div>
-          <div class="field"><label for="attendeesImp">参会人 <small>可选，每行一个</small></label><textarea id="attendeesImp" rows="4" placeholder="张三&#10;李四"></textarea></div>
+          <div class="field attendee-field">
+            <label for="attendeesImpInput">参会人 <small>可选</small></label>
+            <div class="attendee-editor" data-attendee-editor="import">
+              <div class="attendee-chips" id="attendeesImpChips"><span class="attendee-empty">还没有添加参会人</span></div>
+              <div class="attendee-entry"><input id="attendeesImpInput" maxlength="1000" placeholder="输入姓名，按 Enter 添加"><button type="button" data-add-attendee="import">添加</button></div>
+            </div>
+            <div class="attendee-suggestions" id="attendeesImpSuggestions"></div>
+          </div>
+          <div class="field detail-field">
+            <label>纪要详细程度 <small>生成后仍可调整</small></label>
+            <div class="detail-picker" id="detailImp" role="radiogroup" aria-label="导入会议纪要详细程度">
+              <label><input type="radio" name="detailImp" value="brief" checked><i>01</i><span><b>简要</b><small>结论优先</small></span></label>
+              <label><input type="radio" name="detailImp" value="standard"><i>02</i><span><b>标准</b><small>背景与观点</small></span></label>
+              <label><input type="radio" name="detailImp" value="detailed"><i>03</i><span><b>详细</b><small>完整脉络 · 增强模型</small></span></label>
+            </div>
+          </div>
           <button class="button primary wide" id="btnStartImport" type="button" disabled>开始生成纪要</button>
         </section>
         <div class="import-stack">
@@ -227,6 +258,15 @@
           <div class="document-head">
             <div><span class="document-kicker">MEETING NOTES</span><input id="documentTitle" value="选择一份纪要开始编辑" readonly aria-label="纪要标题"><p id="minutesPath">纪要保存在本机输出目录</p></div>
             <div class="document-meta"><span id="documentTime">—</span><span id="documentWords">0 字</span></div>
+          </div>
+          <div class="generation-bar" id="minutesGenerationBar">
+            <div class="generation-copy"><strong>纪要详细程度</strong><small id="minutesDetailMeta">选择档位后可直接重新生成，不重复转写</small></div>
+            <div class="detail-segments" role="group" aria-label="重新生成纪要的详细程度">
+              <button type="button" data-editor-detail="brief" class="active" disabled>简要</button>
+              <button type="button" data-editor-detail="standard" disabled>标准</button>
+              <button type="button" data-editor-detail="detailed" disabled>详细</button>
+            </div>
+            <button class="regenerate-button" id="btnRegenerateMinutes" type="button" disabled>按此档重新生成</button>
           </div>
           <div class="editor-toolbar" id="editorToolbar" aria-label="编辑工具栏">
             <select id="blockFormat" disabled aria-label="段落格式"><option value="p">正文</option><option value="h1">一级标题</option><option value="h2">二级标题</option><option value="h3">三级标题</option><option value="h4">四级标题</option><option value="h5">五级标题</option><option value="h6">六级标题</option><option value="blockquote">引用</option></select>
@@ -285,6 +325,14 @@
         <div class="field"><label for="setTM">转写模型</label><select id="setTM"><option>fun-asr</option><option>paraformer-v2</option></select></div>
         <div class="field"><label for="setLM">纪要模型</label><select id="setLM"><option>qwen-flash</option><option>qwen-plus</option><option>qwen-max</option></select></div>
         <div class="field full"><label for="setOut">输出目录</label><div class="input-action"><input id="setOut"><button class="button secondary compact" id="btnBrowseOut" type="button">浏览</button></div></div>
+        <div class="form-section"><span>03</span><div><strong>常用参会人</strong><small>在录制和导入时一键添加</small></div></div>
+        <div class="field full attendee-field compact-attendees">
+          <label for="attendeesSettingsInput">参会人名册 <small>仅保存在本机</small></label>
+          <div class="attendee-editor" data-attendee-editor="settings">
+            <div class="attendee-chips" id="attendeesSettingsChips"><span class="attendee-empty">还没有常用参会人</span></div>
+            <div class="attendee-entry"><input id="attendeesSettingsInput" maxlength="1000" placeholder="输入姓名，按 Enter 添加"><button type="button" data-add-attendee="settings">添加</button></div>
+          </div>
+        </div>
       </div>
       <div class="modal-foot"><button class="button secondary" data-close="settingsOverlay" type="button">取消</button><button class="button primary" id="btnSaveSettings" type="button">保存设置</button></div>
     </section>
@@ -295,9 +343,9 @@
       <div class="modal-head"><div><span class="eyebrow simple">GETTING STARTED</span><h2 id="guideTitle">使用说明</h2><p>三分钟完成首次配置，之后打开即用。</p></div><button class="modal-close" data-close="guideOverlay" type="button">×</button></div>
       <div class="guide-steps">
         <article><b>01</b><div><h3>配置百炼 API</h3><p>点击右上角设置，填写 API Key。公司有专属网关时再填写 API Host。</p></div></article>
-        <article><b>02</b><div><h3>选择工作方式</h3><p>实时会议使用“会议录制”；已有音视频使用“导入生成”。macOS 首次录制会提示安装 BlackHole 驱动。</p></div></article>
-        <article><b>03</b><div><h3>等待自动处理</h3><p>程序会依次完成上传、转写和纪要生成。不要在处理过程中关闭窗口。</p></div></article>
-        <article><b>04</b><div><h3>编辑与交付</h3><p>在纪要工作区校对内容，按 ⌘S 保存，也可以导出 Markdown 或打开原始转写。</p></div></article>
+        <article><b>02</b><div><h3>选择方式与详细程度</h3><p>实时会议使用“会议录制”，已有音视频使用“导入生成”；开始前选择简要、标准或详细档。</p></div></article>
+        <article><b>03</b><div><h3>添加参会人并处理</h3><p>用姓名标签添加本场参会人，程序随后依次完成上传、转写和纪要生成。macOS 首次录制会提示安装 BlackHole。</p></div></article>
+        <article><b>04</b><div><h3>编辑、匹配与重生成</h3><p>在纪要工作区校对内容、匹配说话人；也可换档重新生成而不重复转写，旧稿会自动备份。</p></div></article>
       </div>
       <div class="guide-tip"><strong>隐私提示</strong><span>会议音频和结果默认保存在本机；转写时音频会临时上传到配置的百炼服务。</span></div>
       <div class="modal-foot"><button class="button primary" data-close="guideOverlay" type="button">知道了</button></div>
@@ -306,9 +354,12 @@
 
   <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
     <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.6</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
-      <div class="release-hero"><span>0.1.6</span><div><strong>可靠麦克风测试与会后参会人匹配</strong><small>2026-08-31 · Feature update</small></div></div>
+      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.7</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
+      <div class="release-hero"><span>0.1.7</span><div><strong>三档纪要与可视化参会人工作流</strong><small>2026-09-04 · Feature update</small></div></div>
       <div class="release-list">
+        <article><span>NEW</span><div><h3>简要、标准、详细三档纪要</h3><p>录制和导入前即可选择；标准档保留背景与主要观点，详细档补充讨论脉络、分歧和决策依据。</p></div></article>
+        <article><span>NEW</span><div><h3>会后切档重新生成</h3><p>直接使用已保存的完整转写重新生成，不重复上传音频；覆盖前会把当前纪要备份到本场会议目录。</p></div></article>
+        <article><span>IMPROVED</span><div><h3>可视化参会人配置</h3><p>本场参会人和常用名册统一使用头像标签增删；说话人匹配时可结合发言样例一键选择候选姓名。</p></div></article>
         <article><span>NEW</span><div><h3>会后匹配参会人</h3><p>纪要编辑页可根据样例发言确认说话人 1、2…的姓名，保存后同步更新完整转写和纪要中的说话人标签。</p></div></article>
         <article><span>FIXED</span><div><h3>恢复明确的系统默认麦克风</h3><p>麦克风列表分为“自动选择”和“固定设备”，系统默认项始终置顶，并明确说明会跟随 Windows 及耳机插拔自动切换。</p></div></article>
         <article><span>FIXED</span><div><h3>增强麦克风实时耳返</h3><p>测试改用稳定的阻塞读取链路，优先回放到 Windows 当前默认输出，并增加适度增益与实时音量条。</p></div></article>
