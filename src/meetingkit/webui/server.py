@@ -22,8 +22,11 @@ import webview
 from .. import __version__
 from .. import audio as audio_mod
 from .. import pipeline as pipeline_mod
+from ..cloud import llm as llm_mod
 from ..cloud import transcribe as transcribe_mod
 from ..config import Config, load_config, save_config
+from ..prompt import (DEFAULT_DETAIL_LEVEL, detail_level_info,
+                      normalize_detail_level)
 
 IS_WINDOWS = sys.platform == "win32"
 IS_MACOS = sys.platform == "darwin"
@@ -45,6 +48,8 @@ class UiState:
         self.recorder = None
         self.session_dir: Optional[Path] = None
         self.started_at: Optional[datetime] = None
+        self.meeting_title = ""
+        self.meeting_detail_level = DEFAULT_DETAIL_LEVEL
         self.devices = {"microphones": [], "system_sources": [],
                         "default_microphone": ""}
         self.mic_monitor = None
@@ -100,6 +105,7 @@ class UiState:
             "elapsed": self.rec_duration() if phase == "recording" else 0.0,
             "logs": logs, "devices": devices,
             "session_dir": str(session) if session else "",
+            "meeting_detail_level": self.meeting_detail_level,
             "is_windows": IS_WINDOWS,
             "mic_test_active": mic_test_active,
             "mic_test_error": mic_test_error,
@@ -151,7 +157,7 @@ class Api:
             "api_host": c.api_host,
             "transcribe_model": c.transcribe_model,
             "llm_model": c.llm_model,
-            "attendees": "\n".join(c.attendees),
+            "attendees": list(c.attendees),
             "output_dir": str(c.resolved_output_dir()),
             "system_source": c.system_source,
             "microphone": c.microphone,
@@ -164,7 +170,11 @@ class Api:
             c.api_host = str(data.get("api_host", "")).strip()
             c.transcribe_model = str(data.get("transcribe_model", c.transcribe_model)).strip() or c.transcribe_model
             c.llm_model = str(data.get("llm_model", c.llm_model)).strip() or c.llm_model
-            c.attendees = [l.strip() for l in str(data.get("attendees", "")).splitlines() if l.strip()]
+            raw_attendees = data.get("attendees", c.attendees)
+            if isinstance(raw_attendees, str):
+                raw_attendees = re.split(r"[\n,，;；]+", raw_attendees)
+            if isinstance(raw_attendees, list):
+                c.attendees = pipeline_mod.clean_attendees(raw_attendees)
             out = str(data.get("output_dir", "")).strip()
             if out:
                 c.output_dir = out
@@ -216,7 +226,7 @@ class Api:
             return {"ok": False, "error": f"停止麦克风测试失败：{exc}"}
 
     def start_recording(self, title: str = "", system_source: str = "", microphone: str = "",
-                        attendees: str = "") -> dict:
+                        attendees: str = "", detail_level: str = DEFAULT_DETAIL_LEVEL) -> dict:
         if _state.busy():
             return {"ok": False, "error": "当前有任务进行中"}
         self.stop_mic_test()
@@ -228,10 +238,14 @@ class Api:
         cfg = _state.cfg
         cfg.system_source = "" if system_source.startswith("（") else system_source
         cfg.microphone = "" if microphone.startswith("（") else microphone
-        _state.set(meeting_attendees=[a.strip() for a in attendees.splitlines() if a.strip()])
+        meeting_attendees = pipeline_mod.clean_attendees(
+            re.split(r"[\n,，;；]+", attendees) if isinstance(attendees, str) else attendees
+        )
         title = (title or "").strip()
         _state.set(phase="recording", stage="recording", detail="",
-                   error=None, result=None, started_at=datetime.now())
+                   error=None, result=None, started_at=datetime.now(),
+                   meeting_title=title, meeting_attendees=meeting_attendees,
+                   meeting_detail_level=normalize_detail_level(detail_level))
         _spawn(self._record_worker, title)
         return {"ok": True}
 
@@ -298,14 +312,20 @@ class Api:
             _state.log(f"选择文件失败：{exc}")
         return ""
 
-    def process_file(self, path: str, attendees: str = "") -> dict:
+    def process_file(self, path: str, attendees: str = "",
+                     detail_level: str = DEFAULT_DETAIL_LEVEL) -> dict:
         if _state.busy():
             return {"ok": False, "error": "当前有任务进行中"}
         self.stop_mic_test()
         p = Path(path).expanduser()
         if not p.exists():
             return {"ok": False, "error": f"文件不存在：{p}"}
-        _state.set(meeting_attendees=[a.strip() for a in attendees.splitlines() if a.strip()],
+        meeting_attendees = pipeline_mod.clean_attendees(
+            re.split(r"[\n,，;；]+", attendees) if isinstance(attendees, str) else attendees
+        )
+        _state.set(meeting_attendees=meeting_attendees,
+                   meeting_title="",
+                   meeting_detail_level=normalize_detail_level(detail_level),
                    phase="processing", stage="prepare", detail=str(p.name),
                    error=None, result=None)
         _spawn(self._process_worker, None, p)
@@ -313,12 +333,18 @@ class Api:
 
     # ---------- 管线 ----------
 
+    @staticmethod
+    def _pipeline_progress(stage: str, detail: str) -> None:
+        """同时更新结构化阶段与日志，避免界面永远停留在“准备”。"""
+        _state.set(stage=stage, detail=detail)
+        _state.log(f"{stage}｜{detail}" if detail else stage)
+
     def _process_worker(self, rec, import_path: Optional[Path]) -> None:
         try:
             cfg = _state.cfg
             if not cfg.effective_api_key():
                 raise RuntimeError("未配置百炼 API Key，请先在“设置”中填写。")
-            title = ""
+            title = _state.meeting_title
             if import_path is not None:
                 _state.log(f"导入文件：{import_path}")
                 session = pipeline_mod.new_session_dir(cfg.resolved_output_dir(), "")
@@ -347,7 +373,8 @@ class Api:
             minutes = pipeline_mod.run_pipeline(
                 audio_path, cfg, session_dir=session, title=title,
                 started_at=_state.started_at, attendees=_state.meeting_attendees,
-                progress=lambda s, d: _state.log(f"{s}｜{d}" if d else s))
+                detail_level=_state.meeting_detail_level,
+                progress=self._pipeline_progress)
             _state.set(phase="done",
                        result={"minutes": str(minutes),
                                "transcript": str(session / pipeline_mod.TRANSCRIPT_MD),
@@ -363,7 +390,8 @@ class Api:
             return {"ok": False, "error": "当前有任务进行中"}
         self.stop_mic_test()
         _state.set(phase="idle", stage="", detail="", error=None, result=None,
-                   session_dir=None, started_at=None)
+                   session_dir=None, started_at=None, meeting_title="",
+                   meeting_attendees=[], meeting_detail_level=DEFAULT_DETAIL_LEVEL)
         return {"ok": True}
 
     # ---------- 文件 / 目录 ----------
@@ -423,6 +451,10 @@ class Api:
         try:
             p = self._safe_minutes_path(path)
             transcript = p.parent / pipeline_mod.TRANSCRIPT_MD
+            metadata = pipeline_mod.load_session_metadata(p.parent)
+            detail = detail_level_info(metadata["detail_level"])
+            history_dir = p.parent / pipeline_mod.MINUTES_HISTORY_DIR
+            history_count = len(list(history_dir.glob("*.md"))) if history_dir.exists() else 0
             return {
                 "ok": True,
                 "content": p.read_text(encoding="utf-8"),
@@ -430,6 +462,11 @@ class Api:
                 "session_name": p.parent.name,
                 "transcript": str(transcript) if transcript.exists() else "",
                 "mtime": datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M"),
+                "detail_level": detail["value"],
+                "detail_label": detail["label"],
+                "minutes_model": metadata["minutes_model"],
+                "attendees": metadata["attendees"],
+                "history_count": history_count,
             }
         except Exception as exc:
             return {"ok": False, "error": f"{exc}"}
@@ -507,6 +544,7 @@ class Api:
             if minutes.name != pipeline_mod.MINUTES_MD or not minutes.is_file():
                 raise RuntimeError("会议纪要文件不存在")
             speakers, mapping, stored_candidates = self._speaker_context(minutes)
+            metadata = pipeline_mod.load_session_metadata(minutes.parent)
             candidates = []
             with _state.lock:
                 active_session = _state.session_dir.resolve() if _state.session_dir else None
@@ -516,6 +554,7 @@ class Api:
                     else []
                 )
             for name in [
+                *metadata["attendees"],
                 *stored_candidates,
                 *attendee_candidates,
                 *_state.cfg.attendees,
@@ -561,13 +600,20 @@ class Api:
                     cleaned[str(number)] = name
 
             mapping_path = minutes.parent / pipeline_mod.SPEAKER_MAP_JSON
-            mapping_payload = {"version": 1, "speakers": cleaned}
-            if stored_candidates:
-                mapping_payload["candidates"] = stored_candidates
+            metadata = pipeline_mod.load_session_metadata(minutes.parent)
+            candidates = pipeline_mod.clean_attendees([
+                *metadata["attendees"], *stored_candidates, *cleaned.values(),
+            ])
+            mapping_payload = {
+                "version": 1,
+                "speakers": cleaned,
+                "candidates": candidates,
+            }
             mapping_path.write_text(
                 json.dumps(mapping_payload, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
+            pipeline_mod.save_session_metadata(minutes.parent, attendees=candidates)
 
             transcript_json = minutes.parent / pipeline_mod.TRANSCRIPT_JSON
             transcript_md = minutes.parent / pipeline_mod.TRANSCRIPT_MD
@@ -590,6 +636,104 @@ class Api:
             }
         except Exception as exc:
             return {"ok": False, "error": f"保存说话人匹配失败：{exc}"}
+
+    def regenerate_minutes(self, path: str,
+                           detail_level: str = DEFAULT_DETAIL_LEVEL) -> dict:
+        """基于已保存转写异步重新生成纪要，不重复上传和转写。"""
+        try:
+            if _state.busy():
+                return {"ok": False, "error": "当前有任务进行中，请稍后再试"}
+            minutes = self._safe_minutes_path(path)
+            if minutes.name != pipeline_mod.MINUTES_MD or not minutes.is_file():
+                raise RuntimeError("会议纪要文件不存在")
+            transcript = minutes.parent / pipeline_mod.TRANSCRIPT_MD
+            if not transcript.is_file():
+                raise RuntimeError("这场会议缺少完整转写，无法重新生成纪要")
+            if not _state.cfg.effective_api_key():
+                raise RuntimeError("未配置百炼 API Key，请先在“设置”中填写")
+
+            level = normalize_detail_level(detail_level)
+            info = detail_level_info(level)
+            _state.set(
+                phase="processing",
+                stage="minutes",
+                detail=f"正在重新生成{info['label']}纪要…",
+                error=None,
+                result=None,
+                session_dir=minutes.parent,
+                meeting_detail_level=level,
+            )
+            _state.log(f"纪要重生成｜目标详细程度：{info['label']}（不重复上传和转写）")
+            _spawn(self._regenerate_minutes_worker, minutes, level)
+            return {"ok": True, "detail_level": level, "detail_label": info["label"]}
+        except Exception as exc:
+            return {"ok": False, "error": f"无法重新生成纪要：{exc}"}
+
+    def _regenerate_minutes_worker(self, minutes: Path, detail_level: str) -> None:
+        try:
+            cfg = _state.cfg
+            metadata = pipeline_mod.load_session_metadata(minutes.parent)
+            transcript = minutes.parent / pipeline_mod.TRANSCRIPT_MD
+            _, mapping, stored_candidates = self._speaker_context(minutes)
+            attendees = pipeline_mod.clean_attendees([
+                *metadata["attendees"],
+                *stored_candidates,
+                *mapping.values(),
+            ])
+            try:
+                started_at = datetime.fromisoformat(metadata["started_at"])
+            except (TypeError, ValueError):
+                started_at = datetime.fromtimestamp(minutes.stat().st_mtime)
+
+            generated = llm_mod.generate_minutes(
+                transcript.read_text(encoding="utf-8"),
+                api_key=cfg.effective_api_key(),
+                model=cfg.llm_model,
+                attendees=attendees,
+                meeting_title=metadata["title"],
+                started_at=started_at,
+                detail_level=detail_level,
+                base_url=cfg.llm_base_url(),
+                progress=self._pipeline_progress,
+            )
+
+            history_dir = minutes.parent / pipeline_mod.MINUTES_HISTORY_DIR
+            history_dir.mkdir(exist_ok=True)
+            old_info = detail_level_info(metadata["detail_level"])
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup = history_dir / f"会议纪要_{old_info['label']}_{stamp}.md"
+            index = 1
+            while backup.exists():
+                backup = history_dir / f"会议纪要_{old_info['label']}_{stamp}_{index}.md"
+                index += 1
+            shutil.copy2(minutes, backup)
+
+            temporary = minutes.parent / ".会议纪要.md.tmp"
+            temporary.write_text(generated, encoding="utf-8")
+            temporary.replace(minutes)
+            model = llm_mod.resolve_minutes_model(cfg.llm_model, detail_level)
+            pipeline_mod.save_session_metadata(
+                minutes.parent,
+                attendees=attendees,
+                detail_level=detail_level,
+                minutes_model=model,
+            )
+            (minutes.parent / "done.flag").write_text("ok", encoding="utf-8")
+            _state.set(
+                phase="done",
+                stage="minutes",
+                detail=f"{detail_level_info(detail_level)['label']}纪要已生成",
+                result={
+                    "minutes": str(minutes),
+                    "transcript": str(transcript),
+                    "session": str(minutes.parent),
+                },
+            )
+            _state.log(f"纪要重生成完成：{minutes.name}（旧版已保存到 {backup.name}）")
+        except Exception as exc:
+            detail = str(exc) or repr(exc)
+            _state.set(phase="error", stage="minutes", error=detail)
+            _state.log(f"错误：{detail}")
 
     def save_minutes(self, path: str, content: str) -> dict:
         try:
@@ -644,6 +788,9 @@ class Api:
                     _state.result = None
                     _state.session_dir = None
                     _state.started_at = None
+                    _state.meeting_title = ""
+                    _state.meeting_attendees = []
+                    _state.meeting_detail_level = DEFAULT_DETAIL_LEVEL
             _state.log(f"已永久删除会议文件夹：{session.name}")
             return {"ok": True, "deleted": str(session)}
         except Exception as exc:
@@ -662,9 +809,13 @@ class Api:
                     continue
                 st = m.stat()
                 transcript = d / pipeline_mod.TRANSCRIPT_MD
+                metadata = pipeline_mod.load_session_metadata(d)
+                detail = detail_level_info(metadata["detail_level"])
                 out.append({"name": d.name,
                             "minutes": str(m),
                             "transcript": str(transcript) if transcript.exists() else "",
+                            "detail_level": detail["value"],
+                            "detail_label": detail["label"],
                             "mtime": datetime.fromtimestamp(st.st_mtime).strftime("%m-%d %H:%M"),
                             "mtime_ts": st.st_mtime,
                             "size_kb": max(1, st.st_size // 1024)})

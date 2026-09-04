@@ -73,8 +73,76 @@ def test_minutes_metadata_and_recent_sessions(tmp_path, monkeypatch):
     assert detail["session_name"] == session.name
     assert detail["transcript"] == str(transcript)
     assert detail["mtime"].startswith("20")
+    assert detail["detail_level"] == "brief"
+    assert detail["history_count"] == 0
     assert recent["sessions"][0]["minutes"] == str(minutes)
     assert recent["sessions"][0]["transcript"] == str(transcript)
+    assert recent["sessions"][0]["detail_label"] == "简要"
+
+
+def test_regenerate_minutes_uses_existing_transcript_and_backs_up_old_version(tmp_path, monkeypatch):
+    session = tmp_path / "2026-09-04_0900_详细度测试"
+    session.mkdir()
+    minutes = session / server.pipeline_mod.MINUTES_MD
+    transcript = session / server.pipeline_mod.TRANSCRIPT_MD
+    minutes.write_text("# 原简要纪要\n", encoding="utf-8")
+    transcript.write_text("**说话人1**：完整转写内容\n", encoding="utf-8")
+    server.pipeline_mod.save_session_metadata(
+        session,
+        title="详细度测试",
+        started_at="2026-09-04T09:00:00",
+        attendees=["张三"],
+        detail_level="brief",
+        minutes_model="qwen-flash",
+    )
+    calls = []
+
+    def fake_generate(transcript_md, **kwargs):
+        calls.append((transcript_md, kwargs))
+        return "# 新详细纪要\n\n## 决策记录\n"
+
+    monkeypatch.setattr(server._state, "cfg", Config(
+        api_key="sk-test", output_dir=str(tmp_path), llm_model="qwen-flash",
+    ))
+    monkeypatch.setattr(server._state, "phase", "idle")
+    monkeypatch.setattr(server._state, "stage", "")
+    monkeypatch.setattr(server._state, "result", None)
+    monkeypatch.setattr(server.llm_mod, "generate_minutes", fake_generate)
+    monkeypatch.setattr(server, "_spawn", lambda fn, *args: fn(*args))
+
+    result = server.Api().regenerate_minutes(str(minutes), "detailed")
+
+    assert result == {"ok": True, "detail_level": "detailed", "detail_label": "详细"}
+    assert calls[0][0] == transcript.read_text(encoding="utf-8")
+    assert calls[0][1]["detail_level"] == "detailed"
+    assert calls[0][1]["attendees"] == ["张三"]
+    assert minutes.read_text(encoding="utf-8").startswith("# 新详细纪要")
+    backups = list((session / server.pipeline_mod.MINUTES_HISTORY_DIR).glob("*.md"))
+    assert len(backups) == 1
+    assert backups[0].read_text(encoding="utf-8") == "# 原简要纪要\n"
+    metadata = server.pipeline_mod.load_session_metadata(session)
+    assert metadata["detail_level"] == "detailed"
+    assert metadata["minutes_model"] == "qwen-plus"
+    assert server._state.phase == "done"
+
+
+def test_failed_regeneration_preserves_current_minutes(tmp_path, monkeypatch):
+    session = tmp_path / "2026-09-04_1000_失败保护"
+    session.mkdir()
+    minutes = session / server.pipeline_mod.MINUTES_MD
+    minutes.write_text("# 必须保留的纪要\n", encoding="utf-8")
+    (session / server.pipeline_mod.TRANSCRIPT_MD).write_text("转写", encoding="utf-8")
+    monkeypatch.setattr(server._state, "cfg", Config(api_key="sk-test", output_dir=str(tmp_path)))
+    monkeypatch.setattr(server._state, "phase", "idle")
+    monkeypatch.setattr(server.llm_mod, "generate_minutes", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("模型失败")))
+    monkeypatch.setattr(server, "_spawn", lambda fn, *args: fn(*args))
+
+    result = server.Api().regenerate_minutes(str(minutes), "standard")
+
+    assert result["ok"] is True
+    assert minutes.read_text(encoding="utf-8") == "# 必须保留的纪要\n"
+    assert server._state.phase == "error"
+    assert "模型失败" in server._state.error
 
 
 def test_speaker_mapping_uses_samples_and_regenerates_transcript(tmp_path, monkeypatch):

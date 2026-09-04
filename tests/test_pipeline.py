@@ -7,7 +7,8 @@ import numpy as np
 from meetingkit.audio.base import write_wav_mono
 from meetingkit.config import Config
 from meetingkit.pipeline import (AUDIO_WAV, MINUTES_MD, SPEAKER_MAP_JSON,
-                                 TRANSCRIPT_JSON, TRANSCRIPT_MD,
+                                 SESSION_META_JSON, TRANSCRIPT_JSON, TRANSCRIPT_MD,
+                                 clean_attendees, load_session_metadata,
                                  new_session_dir, prepare_audio, run_pipeline)
 
 
@@ -27,7 +28,8 @@ def _fake_transcribe(audio_path, *, api_key, model, diarization,
 
 
 def _fake_minutes(transcript_md, *, api_key, model, attendees,
-                  meeting_title, started_at, base_url="", progress=None, _counter=[0]):
+                  meeting_title, started_at, detail_level="brief", base_url="",
+                  progress=None, _counter=[0]):
     _counter[0] += 1
     return f"# 会议纪要\n\n来自：{transcript_md[:20]}…\n"
 
@@ -77,6 +79,7 @@ def test_run_pipeline_full_and_cache(tmp_path, monkeypatch):
 
     session = new_session_dir(cfg.resolved_output_dir(), "测试会")
     minutes = run_pipeline(src, cfg, session_dir=session, title="测试会",
+                           detail_level="detailed",
                            transcribe_fn=t_fn, minutes_fn=m_fn)
     assert minutes.exists()
     assert (session / AUDIO_WAV).exists()
@@ -84,16 +87,35 @@ def test_run_pipeline_full_and_cache(tmp_path, monkeypatch):
     assert (session / TRANSCRIPT_MD).exists()
     speaker_meta = json.loads((session / SPEAKER_MAP_JSON).read_text(encoding="utf-8"))
     assert speaker_meta == {"version": 1, "speakers": {}, "candidates": ["张三"]}
+    session_meta = json.loads((session / SESSION_META_JSON).read_text(encoding="utf-8"))
+    assert session_meta["title"] == "测试会"
+    assert session_meta["attendees"] == ["张三"]
+    assert session_meta["detail_level"] == "detailed"
+    assert session_meta["minutes_model"] == "qwen-plus"
     tmd = (session / TRANSCRIPT_MD).read_text(encoding="utf-8")
     assert "说话人1" in tmd and "说话人2" in tmd
     # 同一说话人连续发言被合并
     assert tmd.count("说话人2") == 1
 
     # 第二次运行：全部命中缓存，云端调用不增加
-    run_pipeline(src, cfg, session_dir=session, title="测试会",
+    run_pipeline(src, cfg, session_dir=session, title="测试会", detail_level="detailed",
                  transcribe_fn=t_fn, minutes_fn=m_fn)
     assert t_counter[0] == 1
     assert m_counter[0] == 1
+
+
+def test_old_session_metadata_defaults_to_brief(tmp_path):
+    session = tmp_path / "legacy"
+    session.mkdir()
+
+    metadata = load_session_metadata(session)
+
+    assert metadata["detail_level"] == "brief"
+    assert metadata["attendees"] == []
+
+
+def test_attendees_accept_pasted_text_and_deduplicate_case_insensitively():
+    assert clean_attendees("张三, 李四\nzhang san；ZHANG SAN") == ["张三", "李四", "zhang san"]
 
 
 def test_run_pipeline_requires_api_key(tmp_path, monkeypatch):

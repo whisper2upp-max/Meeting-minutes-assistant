@@ -21,7 +21,7 @@ def test_home_contains_guide_changelog_and_version():
 
     assert 'id="guideOverlay"' in html
     assert 'id="changelogOverlay"' in html
-    assert "v0.1.6" in html
+    assert "v0.1.7" in html
     assert 'data-view-panel="minutes"' in html
 
 
@@ -91,6 +91,24 @@ def test_minutes_editor_exposes_post_meeting_speaker_mapping():
     assert "get_speaker_mapping" in javascript
     assert "save_speaker_mapping" in javascript
     assert "replaceSpeakerLabels" in javascript
+    assert 'className = "speaker-candidate"' in javascript
+
+
+def test_detail_levels_regeneration_and_visual_attendees_are_wired():
+    html = (WEBUI / "index.html").read_text(encoding="utf-8")
+    javascript = (WEBUI / "app.js").read_text(encoding="utf-8")
+    css = (WEBUI / "styles.css").read_text(encoding="utf-8")
+
+    for level in ("brief", "standard", "detailed"):
+        assert html.count(f'value="{level}"') >= 2
+        assert f'data-editor-detail="{level}"' in html
+    assert 'id="btnRegenerateMinutes"' in html
+    assert "regenerate_minutes" in javascript
+    assert 'data-attendee-editor="record"' in html
+    assert 'data-attendee-editor="import"' in html
+    assert 'data-attendee-editor="settings"' in html
+    assert ".attendee-chip" in css
+    assert ".detail-picker" in css
 
 
 def test_packaging_includes_all_webui_assets():
@@ -125,12 +143,12 @@ def test_release_builds_embed_version_metadata():
     assert '--version-file assets\\version_info.txt' in workflow
     assert '--version-file assets\\version_info.txt' in windows_script
     for content in (workflow, macos_script):
-        assert "Set :CFBundleShortVersionString 0.1.6" in content
-        assert "Set :CFBundleVersion 0.1.6" in content
-    assert "filevers=(0, 1, 6, 0)" in windows_version
-    assert "prodvers=(0, 1, 6, 0)" in windows_version
-    assert "StringStruct('FileVersion', '0.1.6')" in windows_version
-    assert "StringStruct('ProductVersion', '0.1.6')" in windows_version
+        assert "Set :CFBundleShortVersionString 0.1.7" in content
+        assert "Set :CFBundleVersion 0.1.7" in content
+    assert "filevers=(0, 1, 7, 0)" in windows_version
+    assert "prodvers=(0, 1, 7, 0)" in windows_version
+    assert "StringStruct('FileVersion', '0.1.7')" in windows_version
+    assert "StringStruct('ProductVersion', '0.1.7')" in windows_version
 
 
 def test_windows_release_uses_native_certificate_store():

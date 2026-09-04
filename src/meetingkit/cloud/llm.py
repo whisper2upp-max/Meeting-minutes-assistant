@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Callable, List, Optional
 
 from openai import OpenAI, APIConnectionError, APIStatusError, RateLimitError
 
-from ..prompt import build_minutes_prompt
+from ..prompt import (DEFAULT_DETAIL_LEVEL, build_minutes_prompt,
+                      normalize_detail_level)
 from ..tls import certificate_error_help, is_certificate_verification_error
 
 Progress = Callable[[str, str], None]
@@ -17,6 +17,14 @@ Progress = Callable[[str, str], None]
 _DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 _MAX_RETRIES = 3
 _RETRY_BACKOFF_SEC = 3
+
+
+def resolve_minutes_model(model: str, detail_level: str = DEFAULT_DETAIL_LEVEL) -> str:
+    """详细档在默认轻量模型下升级到 qwen-plus；用户显式选择的其他模型保持不变。"""
+    configured = str(model or "").strip() or "qwen-flash"
+    if normalize_detail_level(detail_level) == "detailed" and configured == "qwen-flash":
+        return "qwen-plus"
+    return configured
 
 
 def generate_minutes(
@@ -27,13 +35,16 @@ def generate_minutes(
     attendees: Optional[List[str]] = None,
     meeting_title: str = "",
     started_at: Optional[datetime] = None,
+    detail_level: str = DEFAULT_DETAIL_LEVEL,
     base_url: str = "",
     progress: Optional[Progress] = None,
 ) -> str:
     attendees = [a.strip() for a in (attendees or []) if a.strip()]
+    detail_level = normalize_detail_level(detail_level)
+    model = resolve_minutes_model(model, detail_level)
     messages = build_minutes_prompt(
         transcript_md, attendees=attendees, meeting_title=meeting_title,
-        started_at=started_at,
+        started_at=started_at, detail_level=detail_level,
     )
 
     endpoint = (base_url or "").strip() or _DEFAULT_BASE_URL

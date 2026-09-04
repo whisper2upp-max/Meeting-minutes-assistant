@@ -17,6 +17,12 @@ const state = {
   handledResult: null,
   pendingDeleteSession: null,
   speakerMapping: {},
+  attendees: { record: [], import: [], settings: [] },
+  attendeeSuggestions: [],
+  activeDetailLevel: "brief",
+  targetDetailLevel: "brief",
+  minutesModel: "",
+  minutesHistoryCount: 0,
   toastTimer: null,
 };
 
@@ -54,6 +60,120 @@ function basename(path) {
 function sessionTitle(session) {
   const name = String(session?.name || "未命名会议");
   return name.replace(/^\d{4}-\d{2}-\d{2}_\d{4}(?:_)?/, "") || name;
+}
+
+const attendeeUi = {
+  record: { chips: "attendeesRecChips", input: "attendeesRecInput", suggestions: "attendeesRecSuggestions" },
+  import: { chips: "attendeesImpChips", input: "attendeesImpInput", suggestions: "attendeesImpSuggestions" },
+  settings: { chips: "attendeesSettingsChips", input: "attendeesSettingsInput", suggestions: null },
+};
+
+const detailLabels = { brief: "简要", standard: "标准", detailed: "详细" };
+
+function normalizeAttendeeNames(values) {
+  const raw = Array.isArray(values) ? values : String(values || "").split(/[\n,，;；]+/);
+  const seen = new Set();
+  return raw
+    .map((value) => String(value || "").trim().slice(0, 40))
+    .filter((value) => {
+      const key = value.toLocaleLowerCase();
+      if (!value || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function attendeeInitial(name) {
+  const value = String(name || "?").trim();
+  return value.slice(0, 1).toLocaleUpperCase() || "?";
+}
+
+function renderAttendees(scope) {
+  const ui = attendeeUi[scope];
+  if (!ui || !$(ui.chips)) return;
+  const values = state.attendees[scope] || [];
+  const chips = $(ui.chips);
+  chips.replaceChildren();
+  if (!values.length) {
+    const empty = document.createElement("span");
+    empty.className = "attendee-empty";
+    empty.textContent = scope === "settings" ? "还没有常用参会人" : "还没有添加参会人";
+    chips.appendChild(empty);
+  } else {
+    values.forEach((name) => {
+      const chip = document.createElement("span");
+      const avatar = document.createElement("i");
+      const copy = document.createElement("span");
+      const remove = document.createElement("button");
+      chip.className = "attendee-chip";
+      avatar.textContent = attendeeInitial(name);
+      copy.textContent = name;
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.title = `移除 ${name}`;
+      remove.setAttribute("aria-label", remove.title);
+      remove.addEventListener("click", () => {
+        state.attendees[scope] = values.filter((item) => item !== name);
+        renderAttendees(scope);
+      });
+      chip.append(avatar, copy, remove);
+      chips.appendChild(chip);
+    });
+  }
+
+  if (!ui.suggestions) return;
+  const suggestions = $(ui.suggestions);
+  suggestions.replaceChildren();
+  state.attendeeSuggestions
+    .filter((name) => !values.includes(name))
+    .slice(0, 10)
+    .forEach((name) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = `+ ${name}`;
+      button.addEventListener("click", () => addAttendees(scope, [name]));
+      suggestions.appendChild(button);
+    });
+}
+
+function setAttendees(scope, values) {
+  state.attendees[scope] = normalizeAttendeeNames(values);
+  renderAttendees(scope);
+}
+
+function addAttendees(scope, values) {
+  setAttendees(scope, [...(state.attendees[scope] || []), ...normalizeAttendeeNames(values)]);
+}
+
+function commitAttendeeInput(scope) {
+  const input = $(attendeeUi[scope]?.input);
+  if (!input) return;
+  addAttendees(scope, input.value);
+  input.value = "";
+}
+
+function attendeeText(scope) {
+  return (state.attendees[scope] || []).join("\n");
+}
+
+function selectedDetail(groupId) {
+  return $(`${groupId}`)?.querySelector("input:checked")?.value || "brief";
+}
+
+function setEditorDetail(level, makeCurrent = false) {
+  const normalized = detailLabels[level] ? level : "brief";
+  state.targetDetailLevel = normalized;
+  if (makeCurrent) state.activeDetailLevel = normalized;
+  qa("[data-editor-detail]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.editorDetail === normalized);
+  });
+}
+
+function statusTargetsActiveSession(status) {
+  if (!state.activeMinutes || !status?.session_dir) return false;
+  const path = String(state.activeMinutes).replace(/\\/g, "/").toLocaleLowerCase();
+  const session = String(status.session_dir).replace(/\\/g, "/").replace(/\/$/, "").toLocaleLowerCase();
+  return path.startsWith(`${session}/`);
 }
 
 function api() {
@@ -174,6 +294,40 @@ function renderProgress(status) {
   $("btnOpenResult").classList.toggle("hidden", phase !== "done" || !status.result?.minutes);
 }
 
+function renderMinutesGeneration(status = state.status || {}) {
+  const enabled = Boolean(state.activeMinutes);
+  const currentTask = statusTargetsActiveSession(status);
+  const regenerating = enabled && currentTask && status.phase === "processing" && status.stage === "minutes";
+  qa("[data-editor-detail]").forEach((button) => { button.disabled = !enabled || regenerating; });
+  const button = $("btnRegenerateMinutes");
+  button.disabled = !enabled || regenerating;
+  button.classList.toggle("processing", regenerating);
+  if (!enabled) {
+    button.textContent = "按此档重新生成";
+    $("minutesDetailMeta").textContent = "选择档位后可直接重新生成，不重复转写";
+    return;
+  }
+  if (regenerating) {
+    button.textContent = "正在重新生成…";
+    $("minutesDetailMeta").textContent = status.detail || `正在生成${detailLabels[state.targetDetailLevel]}纪要，旧版本已安全保留`;
+    return;
+  }
+  if (currentTask && status.phase === "error" && status.stage === "minutes") {
+    $("minutesDetailMeta").textContent = `重新生成失败：${status.error || "请稍后重试"}`;
+    button.textContent = "重试重新生成";
+    return;
+  }
+
+  const current = detailLabels[state.activeDetailLevel] || detailLabels.brief;
+  const target = detailLabels[state.targetDetailLevel] || detailLabels.brief;
+  const model = state.minutesModel ? ` · ${state.minutesModel}` : "";
+  const history = state.minutesHistoryCount ? ` · 已备份 ${state.minutesHistoryCount} 版` : "";
+  $("minutesDetailMeta").textContent = state.targetDetailLevel === state.activeDetailLevel
+    ? `当前为${current}${model}${history}`
+    : `当前为${current}${model}${history}；将改为${target}`;
+  button.textContent = state.targetDetailLevel === state.activeDetailLevel ? "重新生成当前档" : `改为${target}并重新生成`;
+}
+
 function renderHeaderStatus(status) {
   const chip = $("statusChip");
   const labels = { idle: "本机就绪", recording: "录音中", processing: "处理中", done: "已完成", error: "需要处理" };
@@ -198,7 +352,9 @@ function renderRecorder(status) {
   $("consoleSource").textContent = rec ? "双轨采集中" : status.phase === "processing" ? "处理中" : "等待开始";
   $("consoleSource").previousElementSibling?.querySelector("i")?.classList.toggle("live", rec);
   $("btnRecord").disabled = status.phase === "processing";
-  ["titleInput", "attendeesRec"].forEach((id) => { $(id).disabled = busy; });
+  $("titleInput").disabled = busy;
+  qa('[data-attendee-editor="record"] input, [data-attendee-editor="record"] button, [data-attendee-editor="import"] input, [data-attendee-editor="import"] button, #attendeesRecSuggestions button, #attendeesImpSuggestions button, #detailRec input, #detailImp input')
+    .forEach((control) => { control.disabled = busy; });
   ["micSelect", "btnRefresh"].forEach((id) => { $(id).disabled = busy || micTesting; });
   $("micTestRow").classList.toggle("hidden", !status.is_windows);
   $("btnMicTest").disabled = busy;
@@ -258,6 +414,7 @@ async function pollStatus() {
     renderHeaderStatus(status);
     renderRecorder(status);
     renderProgress(status);
+    renderMinutesGeneration(status);
     appendLogs(status.logs);
 
     const resultPath = status.result?.minutes;
@@ -329,11 +486,13 @@ async function toggleMicTest() {
 }
 
 async function startRecording() {
+  commitAttendeeInput("record");
   const result = await api().start_recording(
     $("titleInput").value,
     $("systemSelect").value || "",
     $("micSelect").value || "",
-    $("attendeesRec").value,
+    attendeeText("record"),
+    selectedDetail("detailRec"),
   );
   if (result.need_setup) {
     openOverlay("setupOverlay");
@@ -366,7 +525,8 @@ async function chooseImportFile() {
 
 async function startImport() {
   if (!state.importPath) return;
-  const result = await api().process_file(state.importPath, $("attendeesImp").value);
+  commitAttendeeInput("import");
+  const result = await api().process_file(state.importPath, attendeeText("import"), selectedDetail("detailImp"));
   if (!result.ok) toast(result.error);
 }
 
@@ -600,6 +760,9 @@ function setEditorEnabled(enabled) {
   ["btnExport", "btnOpenFolder"].forEach((id) => { $(id).disabled = !enabled; });
   $("btnTranscript").disabled = !enabled || !state.transcriptPath;
   $("btnSpeakerMapping").disabled = !enabled;
+  qa("[data-editor-detail]").forEach((button) => { button.disabled = !enabled; });
+  $("btnRegenerateMinutes").disabled = !enabled;
+  renderMinutesGeneration(state.status || {});
   updateTableControls();
 }
 
@@ -628,13 +791,17 @@ function clearEditor() {
   state.activeMinutes = null;
   state.transcriptPath = null;
   state.speakerMapping = {};
+  state.minutesModel = "";
+  state.minutesHistoryCount = 0;
   state.dirty = false;
+  setEditorDetail("brief", true);
   $("minutesBody").classList.add("empty");
   $("minutesBody").innerHTML = '<div class="editor-empty"><span><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/></svg></span><strong>选择左侧会议纪要</strong><small>这里可以直接编辑标题、段落、列表和行动项表格。</small></div>';
   $("documentTitle").value = "选择一份纪要开始编辑";
   $("minutesPath").textContent = "纪要保存在本机输出目录";
   $("documentTime").textContent = "—";
   $("documentWords").textContent = "0 字";
+  $("minutesDetailMeta").textContent = "选择档位后可直接重新生成，不重复转写";
   $("saveState").className = "save-state";
   $("saveState").innerHTML = "<i></i> 未选择纪要";
   setEditorEnabled(false);
@@ -677,10 +844,14 @@ async function openSpeakerMapping() {
     const title = document.createElement("strong");
     const status = document.createElement("small");
     const sample = document.createElement("p");
+    const assignment = document.createElement("div");
     const input = document.createElement("input");
+    const choices = document.createElement("div");
     row.className = "speaker-map-row";
     label.className = "speaker-map-label";
     sample.className = "speaker-map-sample";
+    assignment.className = "speaker-assignment";
+    choices.className = "speaker-candidate-list";
     title.textContent = speaker.label || `说话人${speaker.number}`;
     status.textContent = state.speakerMapping[String(speaker.number)] ? "已匹配" : "待确认";
     sample.textContent = speaker.sample || "没有可展示的发言样例";
@@ -690,8 +861,34 @@ async function openSpeakerMapping() {
     input.setAttribute("list", "speakerCandidates");
     input.dataset.speakerNumber = String(speaker.number);
     input.value = state.speakerMapping[String(speaker.number)] || "";
+    const refreshChoiceState = () => {
+      const value = input.value.trim();
+      status.textContent = value ? "已匹配" : "待确认";
+      qa(".speaker-candidate", choices).forEach((button) => {
+        button.classList.toggle("selected", button.dataset.name === value);
+      });
+    };
+    (result.candidates || []).slice(0, 8).forEach((name) => {
+      const choice = document.createElement("button");
+      const avatar = document.createElement("i");
+      const copy = document.createElement("span");
+      choice.type = "button";
+      choice.className = "speaker-candidate";
+      choice.dataset.name = name;
+      avatar.textContent = attendeeInitial(name);
+      copy.textContent = name;
+      choice.append(avatar, copy);
+      choice.addEventListener("click", () => {
+        input.value = name;
+        refreshChoiceState();
+      });
+      choices.appendChild(choice);
+    });
+    input.addEventListener("input", refreshChoiceState);
+    refreshChoiceState();
     label.append(title, status);
-    row.append(label, sample, input);
+    assignment.append(input, choices);
+    row.append(label, sample, assignment);
     rows.appendChild(row);
   });
   if (!(result.speakers || []).length) {
@@ -736,6 +933,9 @@ async function openMinutes(path) {
   if (!result.ok) return toast(result.error);
   state.activeMinutes = path;
   state.transcriptPath = result.transcript || "";
+  state.minutesModel = result.minutes_model || "";
+  state.minutesHistoryCount = Number(result.history_count) || 0;
+  setEditorDetail(result.detail_level || "brief", true);
   state.dirty = false;
   $("minutesBody").classList.remove("empty");
   $("minutesBody").innerHTML = markdownToHtml(result.content);
@@ -745,8 +945,29 @@ async function openMinutes(path) {
   updateWordCount();
   markSaved();
   setEditorEnabled(true);
+  renderMinutesGeneration(state.status || {});
   renderSessionList();
   setActiveView("minutes", true);
+}
+
+async function regenerateMinutes() {
+  if (!state.activeMinutes || !state.apiReady) return toast("请先选择一份会议纪要");
+  if (state.dirty) {
+    if (!window.confirm("当前纪要有未保存修改。要先保存，再重新生成吗？")) return;
+    if (!await saveMinutes()) return;
+  }
+  const target = state.targetDetailLevel;
+  const label = detailLabels[target] || detailLabels.brief;
+  const sameLevel = target === state.activeDetailLevel;
+  const copy = sameLevel
+    ? `确定重新生成一版${label}纪要吗？当前纪要会先备份到本场会议的“纪要历史版本”文件夹。`
+    : `确定将当前纪要改为${label}档并重新生成吗？不会重复上传或转写，当前纪要会先备份。`;
+  if (!window.confirm(copy)) return;
+  const result = await api().regenerate_minutes(state.activeMinutes, target);
+  if (!result.ok) return toast(result.error || "无法重新生成纪要");
+  state.handledResult = null;
+  toast(`正在生成${label}纪要，可继续留在当前页面等待`);
+  await pollStatus();
 }
 
 async function saveMinutes() {
@@ -832,7 +1053,7 @@ function renderSessionList() {
     const badge = document.createElement("span");
     title.textContent = sessionTitle(session);
     time.textContent = session.mtime || "未知时间";
-    badge.textContent = session.transcript ? "MINUTES + TRANSCRIPT" : "MINUTES";
+    badge.textContent = `${session.detail_label || "简要"} · ${session.transcript ? "MINUTES + TRANSCRIPT" : "MINUTES"}`;
     button.append(title, time, badge);
     button.addEventListener("click", () => openMinutes(session.minutes));
     deleteButton.addEventListener("click", () => requestDeleteSession(session));
@@ -865,7 +1086,7 @@ function renderRecent() {
     open.className = "recent-open";
     date.textContent = (session.mtime || "-- --").split(" ")[0].replace("-", "/");
     title.textContent = sessionTitle(session);
-    meta.textContent = session.mtime || "本机纪要";
+    meta.textContent = `${session.mtime || "本机纪要"} · ${session.detail_label || "简要"}纪要`;
     size.textContent = `${session.size_kb || 0} KB`;
     open.textContent = "编辑纪要";
     copy.append(title, meta);
@@ -896,18 +1117,24 @@ async function openSettings() {
   $("setTM").value = config.transcribe_model || "fun-asr";
   $("setLM").value = config.llm_model || "qwen-flash";
   $("setOut").value = config.output_dir || "";
+  setAttendees("settings", config.attendees || []);
   openOverlay("settingsOverlay");
 }
 
 async function saveSettings() {
+  commitAttendeeInput("settings");
   const result = await api().save_config({
     api_key: $("setKey").value,
     api_host: $("setHost").value,
     transcribe_model: $("setTM").value,
     llm_model: $("setLM").value,
     output_dir: $("setOut").value,
+    attendees: state.attendees.settings,
   });
   if (!result.ok) return toast(`保存失败：${result.error}`);
+  state.attendeeSuggestions = [...state.attendees.settings];
+  renderAttendees("record");
+  renderAttendees("import");
   closeOverlay("settingsOverlay");
   toast("设置已保存");
   await pollStatus();
@@ -923,6 +1150,32 @@ function bindEvents() {
   qa(".overlay").forEach((overlay) => overlay.addEventListener("click", (event) => {
     if (event.target === overlay) closeOverlay(overlay.id);
   }));
+  qa("[data-add-attendee]").forEach((button) => {
+    button.addEventListener("click", () => commitAttendeeInput(button.dataset.addAttendee));
+  });
+  Object.entries(attendeeUi).forEach(([scope, ui]) => {
+    const input = $(ui.input);
+    input.addEventListener("keydown", (event) => {
+      if (event.isComposing) return;
+      if (event.key === "Enter" || [",", "，", ";", "；"].includes(event.key)) {
+        event.preventDefault();
+        commitAttendeeInput(scope);
+      }
+    });
+    input.addEventListener("paste", (event) => {
+      const pasted = event.clipboardData?.getData("text") || "";
+      if (!/[\n,，;；]/.test(pasted)) return;
+      event.preventDefault();
+      addAttendees(scope, pasted);
+      input.value = "";
+    });
+  });
+  qa("[data-editor-detail]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setEditorDetail(button.dataset.editorDetail);
+      renderMinutesGeneration(state.status || {});
+    });
+  });
 
   $("btnGuide").addEventListener("click", () => openOverlay("guideOverlay"));
   $("btnChangelog").addEventListener("click", () => openOverlay("changelogOverlay"));
@@ -986,6 +1239,7 @@ function bindEvents() {
   $("minutesBody").addEventListener("click", updateTableControls);
   $("minutesBody").addEventListener("keyup", updateTableControls);
   $("btnSaveMinutes").addEventListener("click", saveMinutes);
+  $("btnRegenerateMinutes").addEventListener("click", regenerateMinutes);
   $("btnSpeakerMapping").addEventListener("click", openSpeakerMapping);
   $("btnSaveSpeakerMapping").addEventListener("click", saveSpeakerMapping);
   $("btnExport").addEventListener("click", exportMinutes);
@@ -1034,6 +1288,10 @@ async function initializeDesktop() {
   state.apiReady = true;
   await Promise.all([loadDevices(), loadSessions(), pollStatus()]);
   const config = await api().get_config();
+  state.attendeeSuggestions = normalizeAttendeeNames(config.attendees || []);
+  setAttendees("record", []);
+  setAttendees("import", []);
+  setAttendees("settings", state.attendeeSuggestions);
   $("metricTranscribe").textContent = config.transcribe_model || "fun-asr";
   $("metricMinutes").textContent = config.llm_model || "qwen-flash";
   window.setInterval(pollStatus, 650);

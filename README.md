@@ -2,7 +2,7 @@
 
 > 会议纪要助手：同步录制会议内声与麦克风，或导入已有音视频，自动完成说话人分离、全文转写和结构化会议纪要。
 
-[![Version](https://img.shields.io/badge/version-0.1.6-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.1.7-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-18213d.svg)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0aa6b5.svg)
 
@@ -12,7 +12,7 @@
 
 ## 下载
 
-前往 [Releases](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest) 下载对应平台的 v0.1.6 安装包。
+前往 [Releases](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest) 下载对应平台的最新安装包。
 
 | 平台 | 发布文件 | 首次启动 |
 | --- | --- | --- |
@@ -27,8 +27,10 @@
 - 导入 WAV、MP3、M4A、FLAC、MP4、MOV 等已有录音或视频。
 - 使用百炼 `fun-asr` 转写，并自动区分说话人。
 - 使用 `qwen-flash` 生成摘要、关键决策、行动事项和风险。
+- 录制或导入前可选择简要、标准、详细三档纪要；详细档在默认配置下自动使用 `qwen-plus`。
+- 生成后可直接利用现有转写切换详细程度并重新生成，旧纪要会自动备份，无需重复上传音频。
 - 在应用内直接编辑 Markdown 纪要，包含标题、列表、引用和可增删行列的表格。
-- 会后根据样例发言把“说话人1、2…”匹配为真实参会人，并同步更新转写和纪要标签。
+- 使用可视化标签维护本场及常用参会人；会后根据样例发言一键匹配“说话人1、2…”，并同步更新转写和纪要标签。
 - 会议音频、转写稿和纪要按会议分文件夹保存，支持断点续跑与历史管理。
 
 ## 一致的会议工作流
