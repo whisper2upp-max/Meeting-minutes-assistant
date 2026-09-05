@@ -117,6 +117,30 @@ def test_callback_capture_stops_stream_before_closing_wav(tmp_path, monkeypatch)
     assert samples.tolist() == [2000, 3000]
 
 
+def test_live_mic_toggle_writes_silence_without_shifting_system_audio(monkeypatch):
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch", SimpleNamespace(
+        paContinue=0, paComplete=1))
+    recorder = WindowsRecorder()
+    mic_queue = queue.SimpleQueue()
+    system_queue = queue.SimpleQueue()
+    mic_callback = recorder._make_callback(mic_queue, "mic")
+    system_callback = recorder._make_callback(system_queue, "system")
+    pcm = np.array([1200, -900, 450, -300], dtype=np.int16).tobytes()
+
+    recorder.set_mic_enabled(False)
+    mic_callback(pcm, 4, {}, 0)
+    system_callback(pcm, 4, {}, 0)
+
+    assert recorder.mic_enabled is False
+    assert mic_queue.get() == bytes(len(pcm))
+    assert system_queue.get() == pcm
+
+    recorder.set_mic_enabled(True)
+    mic_callback(pcm, 4, {}, 0)
+    assert recorder.mic_enabled is True
+    assert mic_queue.get() == pcm
+
+
 def test_missing_default_output_fails_before_mic_only_recording(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "pyaudiowpatch", SimpleNamespace(
         paInt16=8, paContinue=0, paComplete=1))

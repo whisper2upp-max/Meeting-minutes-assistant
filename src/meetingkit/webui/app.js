@@ -262,10 +262,13 @@ function renderProgress(status) {
     $("pText").textContent = "等待任务";
     $("pSub").textContent = "完成录制或选择文件后，这里会显示处理进度。";
   } else if (rec) {
+    const micCaptureEnabled = status.mic_capture_enabled !== false;
     setProgressIcon("recording");
     $("pLabel").textContent = "LIVE CAPTURE";
     $("pText").textContent = `正在录音 ${formatTime(status.elapsed)}`;
-    $("pSub").textContent = "会议内声与麦克风双轨采集中";
+    $("pSub").textContent = micCaptureEnabled
+      ? "会议内声与麦克风双轨采集中"
+      : "会议内声持续录制中 · 麦克风外录已暂停";
   } else if (processing) {
     setProgressIcon("working");
     $("pLabel").textContent = "PROCESSING";
@@ -340,18 +343,30 @@ function renderRecorder(status) {
   const rec = status.phase === "recording";
   const busy = rec || status.phase === "processing";
   const micTesting = Boolean(status.mic_test_active);
+  const micCaptureEnabled = status.mic_capture_enabled !== false;
   $("timer").textContent = rec ? formatTime(status.elapsed) : "00:00";
   $("btnRecord").classList.toggle("recording", rec);
   $("recordButtonLabel").textContent = rec ? "停止并生成纪要" : "开始录音";
   $("recHint").textContent = rec
-    ? "录音正在进行。会议结束后点击停止，程序会自动进入转写流程。"
+    ? micCaptureEnabled
+      ? "外录已开启；需要旁聊时可随时暂停麦克风，会议内声不会中断。"
+      : "外录已暂停；此时麦克风声音不会写入，会议内声仍在继续录制。"
     : status.phase === "processing"
       ? "录音已完成，正在处理，请稍候。"
       : "准备就绪后点击按钮，会议内声和麦克风将同步录制。";
   $("waveform").classList.toggle("live", rec);
-  $("consoleSource").textContent = rec ? "双轨采集中" : status.phase === "processing" ? "处理中" : "等待开始";
+  $("consoleSource").textContent = rec
+    ? micCaptureEnabled ? "双轨采集中" : "内录中 · 外录暂停"
+    : status.phase === "processing" ? "处理中" : "等待开始";
   $("consoleSource").previousElementSibling?.querySelector("i")?.classList.toggle("live", rec);
   $("btnRecord").disabled = status.phase === "processing";
+  const micCaptureButton = $("btnMicCapture");
+  micCaptureButton.classList.toggle("hidden", !rec);
+  micCaptureButton.classList.toggle("muted", rec && !micCaptureEnabled);
+  micCaptureButton.disabled = !rec;
+  micCaptureButton.setAttribute("aria-pressed", String(rec && micCaptureEnabled));
+  $("micCaptureLabel").textContent = micCaptureEnabled ? "暂停外录" : "恢复外录";
+  $("micCaptureState").textContent = micCaptureEnabled ? "麦克风正在录入" : "麦克风不会写入";
   $("titleInput").disabled = busy;
   qa('[data-attendee-editor="record"] input, [data-attendee-editor="record"] button, [data-attendee-editor="import"] input, [data-attendee-editor="import"] button, #attendeesRecSuggestions button, #attendeesImpSuggestions button, #detailRec input, #detailImp input')
     .forEach((control) => { control.disabled = busy; });
@@ -509,6 +524,23 @@ async function toggleRecording() {
     if (!result.ok) toast(result.error);
   } else if (["idle", "done", "error"].includes(status.phase)) {
     await startRecording();
+  }
+}
+
+async function toggleMicCapture() {
+  if (!state.apiReady) return toast("桌面服务尚未就绪");
+  const status = await api().get_status();
+  if (status.phase !== "recording") return toast("当前没有在录音");
+  const nextEnabled = status.mic_capture_enabled === false;
+  const button = $("btnMicCapture");
+  button.disabled = true;
+  try {
+    const result = await api().set_mic_capture_enabled(nextEnabled);
+    if (!result.ok) return toast(result.error || "无法切换麦克风外录");
+    toast(nextEnabled ? "麦克风外录已恢复" : "麦克风外录已暂停，会议内声继续录制");
+    await pollStatus();
+  } finally {
+    if (state.status?.phase === "recording") button.disabled = false;
   }
 }
 
@@ -1192,6 +1224,7 @@ function bindEvents() {
   });
   $("btnMicTest").addEventListener("click", toggleMicTest);
   $("btnRecord").addEventListener("click", toggleRecording);
+  $("btnMicCapture").addEventListener("click", toggleMicCapture);
   $("btnPickFile").addEventListener("click", chooseImportFile);
   $("btnStartImport").addEventListener("click", startImport);
   $("btnOpenResult").addEventListener("click", () => openMinutes(state.status?.result?.minutes));

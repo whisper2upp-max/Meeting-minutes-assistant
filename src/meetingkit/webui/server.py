@@ -53,6 +53,7 @@ class UiState:
         self.devices = {"microphones": [], "system_sources": [],
                         "default_microphone": ""}
         self.mic_monitor = None
+        self.mic_capture_enabled = True
         self.cfg: Config = load_config()
         self.prev_output_id: Optional[int] = None  # 录音前默认输出设备（macOS 录后还原）
         self.meeting_attendees: List[str] = []     # 本场会议的参会人（会议维度，非全局）
@@ -90,6 +91,7 @@ class UiState:
             devices = dict(self.devices)
             session = self.session_dir
             mic_monitor = self.mic_monitor
+            mic_capture_enabled = self.mic_capture_enabled
         mic_test_active = bool(mic_monitor and mic_monitor.active)
         mic_test_error = mic_monitor.last_error if mic_monitor else None
         host_label = cfg.resolved_api_host()
@@ -112,6 +114,7 @@ class UiState:
             "mic_test_input": mic_monitor.input_name if mic_monitor else "",
             "mic_test_output": mic_monitor.output_name if mic_monitor else "",
             "mic_test_level": float(getattr(mic_monitor, "level", 0.0)) if mic_monitor else 0.0,
+            "mic_capture_enabled": mic_capture_enabled,
             "loopback_ready": loopback_ready,
             "version": __version__,
             "config": {
@@ -245,7 +248,8 @@ class Api:
         _state.set(phase="recording", stage="recording", detail="",
                    error=None, result=None, started_at=datetime.now(),
                    meeting_title=title, meeting_attendees=meeting_attendees,
-                   meeting_detail_level=normalize_detail_level(detail_level))
+                   meeting_detail_level=normalize_detail_level(detail_level),
+                   mic_capture_enabled=True)
         _spawn(self._record_worker, title)
         return {"ok": True}
 
@@ -274,11 +278,18 @@ class Api:
                 rec.start(session)
             except Exception as exc:
                 raise RuntimeError(f"启动录音失败：{exc}")
+            # 开设备期间用户也可能先点“暂停外录”。在同一把状态锁内
+            # 应用最新意图并发布 recorder，避免启动竞态覆盖用户选择。
+            with _state.lock:
+                mic_capture_enabled = _state.mic_capture_enabled
+                rec.set_mic_enabled(mic_capture_enabled)
+                _state.recorder = rec
             if IS_WINDOWS:
                 _state.log("会议内声已启用：Windows 默认输出设备（WASAPI 自动内录）")
+            _state.log("麦克风外录已开启（录制中可随时暂停）" if mic_capture_enabled
+                       else "麦克风外录已暂停；会议内声仍在继续录制")
             for msg in getattr(rec, "last_errors", []):
                 _state.log(f"⚠️ {msg}")
-            _state.set(recorder=rec)
         except Exception as exc:
             if prev_output is not None:
                 from ..audio import mac_setup
@@ -286,13 +297,40 @@ class Api:
             _state.set(phase="error", error=f"{exc}", stage="", detail="")
             _state.log(f"错误：{exc}")
 
+    def set_mic_capture_enabled(self, enabled: bool) -> dict:
+        """实时切换麦克风外录；内录与总录制计时不受影响。"""
+        enabled = bool(enabled)
+        with _state.lock:
+            if _state.phase != "recording":
+                return {"ok": False, "error": "当前没有在录音"}
+            previous = _state.mic_capture_enabled
+            _state.mic_capture_enabled = enabled
+            rec = _state.recorder
+            if rec is not None:
+                setter = getattr(rec, "set_mic_enabled", None)
+                if not callable(setter):
+                    _state.mic_capture_enabled = previous
+                    return {"ok": False, "error": "当前录音器不支持实时外录开关"}
+                try:
+                    setter(enabled)
+                except Exception as exc:
+                    _state.mic_capture_enabled = previous
+                    return {"ok": False, "error": f"切换麦克风外录失败：{exc}"}
+        message = ("麦克风外录已恢复" if enabled
+                   else "麦克风外录已暂停；会议内声仍在继续录制")
+        _state.log(message)
+        return {"ok": True, "enabled": enabled, "pending": rec is None}
+
     def stop_recording(self) -> dict:
         with _state.lock:
             rec = _state.recorder
             if _state.phase != "recording" or rec is None:
                 return {"ok": False, "error": "当前没有在录音"}
             _state.recorder = None
-        _state.set(phase="processing", stage="finalize", detail="正在停止录音并混音…")
+            # 与外录开关共享同一状态锁，避免停止瞬间被误判为仍可排队切换。
+            _state.phase = "processing"
+            _state.stage = "finalize"
+            _state.detail = "正在停止录音并混音…"
         _spawn(self._process_worker, rec, None)
         return {"ok": True}
 
