@@ -16,6 +16,14 @@ class _RecordedTracks:
         return self._specs
 
 
+class _ToggleRecorder:
+    def __init__(self):
+        self.mic_enabled = True
+
+    def set_mic_enabled(self, enabled):
+        self.mic_enabled = enabled
+
+
 def test_recording_process_reaches_pipeline_after_silence_check(tmp_path, monkeypatch):
     """覆盖录音停止后的混音、静音检查和管线调用，防止包内相对导入写错。"""
     sample_rate = 48000
@@ -54,6 +62,36 @@ def test_recording_process_reaches_pipeline_after_silence_check(tmp_path, monkey
     assert len(pipeline_calls) == 1
     assert pipeline_calls[0][0] == tmp_path / server.pipeline_mod.AUDIO_WAV
     assert pipeline_calls[0][0].exists()
+
+
+def test_live_mic_capture_toggle_is_exposed_in_status(monkeypatch):
+    recorder = _ToggleRecorder()
+    monkeypatch.setattr(server._state, "phase", "recording")
+    monkeypatch.setattr(server._state, "recorder", recorder)
+    monkeypatch.setattr(server._state, "mic_capture_enabled", True)
+
+    paused = server.Api().set_mic_capture_enabled(False)
+    paused_status = server.Api().get_status()
+
+    assert paused == {"ok": True, "enabled": False, "pending": False}
+    assert paused_status["mic_capture_enabled"] is False
+    assert recorder.mic_enabled is False
+
+    resumed = server.Api().set_mic_capture_enabled(True)
+
+    assert recorder.mic_enabled is True
+    assert resumed == {"ok": True, "enabled": True, "pending": False}
+
+
+def test_live_mic_toggle_can_be_queued_while_audio_devices_start(monkeypatch):
+    monkeypatch.setattr(server._state, "phase", "recording")
+    monkeypatch.setattr(server._state, "recorder", None)
+    monkeypatch.setattr(server._state, "mic_capture_enabled", True)
+
+    result = server.Api().set_mic_capture_enabled(False)
+
+    assert result == {"ok": True, "enabled": False, "pending": True}
+    assert server.Api().get_status()["mic_capture_enabled"] is False
 
 
 def test_minutes_metadata_and_recent_sessions(tmp_path, monkeypatch):

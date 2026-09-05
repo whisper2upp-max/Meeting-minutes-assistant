@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from meetingkit.audio.macos_rec import MacRecorder
@@ -71,3 +72,32 @@ def test_failed_stream_start_releases_retry_resources(tmp_path, monkeypatch):
     assert stream.closed
     assert recorder._streams == []
     assert recorder._writers == []
+
+
+def test_live_mic_toggle_writes_silence_and_keeps_system_callback_live():
+    class Writer:
+        def __init__(self):
+            self.chunks = []
+
+        def write(self, data):
+            self.chunks.append(data)
+
+    recorder = MacRecorder()
+    mic_writer = Writer()
+    system_writer = Writer()
+    mic_callback = recorder._make_callback(mic_writer, "mic")
+    system_callback = recorder._make_callback(system_writer, "system")
+    pcm = np.array([1300, -700, 200], dtype=np.int16)
+
+    recorder.set_mic_enabled(False)
+    mic_callback(pcm, len(pcm), {}, None)
+    system_callback(pcm, len(pcm), {}, None)
+
+    assert recorder.mic_enabled is False
+    assert mic_writer.chunks == [bytes(pcm.nbytes)]
+    assert system_writer.chunks == [pcm.tobytes()]
+
+    recorder.set_mic_enabled(True)
+    mic_callback(pcm, len(pcm), {}, None)
+    assert recorder.mic_enabled is True
+    assert mic_writer.chunks[-1] == pcm.tobytes()

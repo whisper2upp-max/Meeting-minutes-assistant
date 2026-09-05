@@ -2,7 +2,7 @@
 
 > 会议纪要助手：同步录制会议内声与麦克风，或导入已有音视频，自动完成说话人分离、全文转写和结构化会议纪要。
 
-[![Version](https://img.shields.io/badge/version-0.1.7-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.1.8-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-18213d.svg)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0aa6b5.svg)
 
@@ -24,6 +24,7 @@
 ## 它能做什么
 
 - 在 macOS 和 Windows 上同步捕捉会议内声与麦克风。
+- 录制过程中可随时暂停或恢复麦克风外录；会议内声与总计时持续进行，暂停区间以静音保留时间轴。
 - 导入 WAV、MP3、M4A、FLAC、MP4、MOV 等已有录音或视频。
 - 使用百炼 `fun-asr` 转写，并自动区分说话人。
 - 使用 `qwen-flash` 生成摘要、关键决策、行动事项和风险。

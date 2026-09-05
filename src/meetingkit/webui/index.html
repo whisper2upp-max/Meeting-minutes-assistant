@@ -29,7 +29,7 @@
       <button class="status-chip" id="statusChip" type="button">
         <span class="status-dot"></span><span id="statusText">本机就绪</span>
       </button>
-      <span class="version-chip" id="versionChip">v0.1.7</span>
+      <span class="version-chip" id="versionChip">v0.1.8</span>
       <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
         <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
       </button>
@@ -114,7 +114,7 @@
         <button class="shortcut-card release" id="btnChangelog" type="button">
           <span class="shortcut-index">04</span>
           <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
-          <strong>更新日志</strong><small>v0.1.7 · 三档纪要与可视化参会人</small><i>查看变化 →</i>
+          <strong>更新日志</strong><small>v0.1.8 · 录制中随时暂停外录</small><i>查看变化 →</i>
         </button>
       </div>
 
@@ -180,10 +180,16 @@
             </div>
             <div class="capture-timer" id="timer">00:00</div>
             <p id="recHint">准备就绪后点击按钮，会议内声和麦克风将同步录制。</p>
-            <button class="record-button" id="btnRecord" type="button">
-              <span><svg class="icon-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg><svg class="icon-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span>
-              <b id="recordButtonLabel">开始录音</b>
-            </button>
+            <div class="capture-actions">
+              <button class="record-button" id="btnRecord" type="button">
+                <span><svg class="icon-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg><svg class="icon-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span>
+                <b id="recordButtonLabel">开始录音</b>
+              </button>
+              <button class="mic-capture-button hidden" id="btnMicCapture" type="button" aria-pressed="true">
+                <span class="mic-capture-icon"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M4 4l16 16"/></svg></span>
+                <span class="mic-capture-copy"><b id="micCaptureLabel">暂停外录</b><small id="micCaptureState">麦克风正在录入</small></span>
+              </button>
+            </div>
             <div class="console-meta"><span><i class="red"></i> 本机音频</span><span><i class="cyan"></i> 双轨捕捉</span><span><i class="violet"></i> 自动处理</span></div>
           </section>
         </div>
@@ -344,7 +350,7 @@
       <div class="guide-steps">
         <article><b>01</b><div><h3>配置百炼 API</h3><p>点击右上角设置，填写 API Key。公司有专属网关时再填写 API Host。</p></div></article>
         <article><b>02</b><div><h3>选择方式与详细程度</h3><p>实时会议使用“会议录制”，已有音视频使用“导入生成”；开始前选择简要、标准或详细档。</p></div></article>
-        <article><b>03</b><div><h3>添加参会人并处理</h3><p>用姓名标签添加本场参会人，程序随后依次完成上传、转写和纪要生成。macOS 首次录制会提示安装 BlackHole。</p></div></article>
+        <article><b>03</b><div><h3>添加参会人并处理</h3><p>用姓名标签添加本场参会人；录制中如需旁聊，可暂停麦克风外录而不中断会议内声。程序随后依次完成上传、转写和纪要生成。</p></div></article>
         <article><b>04</b><div><h3>编辑、匹配与重生成</h3><p>在纪要工作区校对内容、匹配说话人；也可换档重新生成而不重复转写，旧稿会自动备份。</p></div></article>
       </div>
       <div class="guide-tip"><strong>隐私提示</strong><span>会议音频和结果默认保存在本机；转写时音频会临时上传到配置的百炼服务。</span></div>
@@ -354,9 +360,10 @@
 
   <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
     <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.7</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
-      <div class="release-hero"><span>0.1.7</span><div><strong>三档纪要与可视化参会人工作流</strong><small>2026-09-04 · Feature update</small></div></div>
+      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.8</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
+      <div class="release-hero"><span>0.1.8</span><div><strong>录制中随时暂停麦克风外录</strong><small>2026-09-05 · Recording control</small></div></div>
       <div class="release-list">
+        <article><span>NEW</span><div><h3>会议内声不断，旁聊不入稿</h3><p>录制中可独立暂停或恢复麦克风外录；暂停区间写入等长静音，既隔离身边对话，也保持双轨时间轴准确。</p></div></article>
         <article><span>NEW</span><div><h3>简要、标准、详细三档纪要</h3><p>录制和导入前即可选择；标准档保留背景与主要观点，详细档补充讨论脉络、分歧和决策依据。</p></div></article>
         <article><span>NEW</span><div><h3>会后切档重新生成</h3><p>直接使用已保存的完整转写重新生成，不重复上传音频；覆盖前会把当前纪要备份到本场会议目录。</p></div></article>
         <article><span>IMPROVED</span><div><h3>可视化参会人配置</h3><p>本场参会人和常用名册统一使用头像标签增删；说话人匹配时可结合发言样例一键选择候选姓名。</p></div></article>

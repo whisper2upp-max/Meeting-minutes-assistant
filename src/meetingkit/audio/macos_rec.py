@@ -54,12 +54,17 @@ class MacRecorder:
         self._specs: List[TrackSpec] = []
         self._errors: List[str] = []
         self._stopped = threading.Event()
+        self._mic_enabled = threading.Event()
+        self._mic_enabled.set()
 
-    def _make_callback(self, writer: WavTrackWriter):
+    def _make_callback(self, writer: WavTrackWriter, label: str):
         def _cb(indata, frames, time_info, status) -> None:
             if status:
                 self._errors.append(str(status))
-            writer.write(indata.tobytes())
+            data = indata.tobytes()
+            # 不停止设备流：用等长静音占位，避免恢复麦克风后与内录错位。
+            writer.write(bytes(len(data)) if label == "mic" and not self._mic_enabled.is_set()
+                         else data)
         return _cb
 
     def _open(self, device: Optional[int], label: str, out_dir: Path) -> Optional[WavTrackWriter]:
@@ -76,7 +81,7 @@ class MacRecorder:
                 channels=1,
                 samplerate=rate,
                 dtype="int16",
-                callback=self._make_callback(writer),
+                callback=self._make_callback(writer, label),
             )
             stream.start()
         except Exception:
@@ -147,6 +152,17 @@ class MacRecorder:
         for w in self._writers:
             w.close()
         return self._specs
+
+    def set_mic_enabled(self, enabled: bool) -> None:
+        """录制过程中启停麦克风写入；系统内录始终保持运行。"""
+        if enabled:
+            self._mic_enabled.set()
+        else:
+            self._mic_enabled.clear()
+
+    @property
+    def mic_enabled(self) -> bool:
+        return self._mic_enabled.is_set()
 
     @property
     def last_errors(self) -> List[str]:

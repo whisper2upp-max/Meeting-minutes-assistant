@@ -351,9 +351,11 @@ class WindowsRecorder:
         self._queues: List[queue.SimpleQueue] = []
         self._threads: List[threading.Thread] = []
         self._stopped = threading.Event()
+        self._mic_enabled = threading.Event()
+        self._mic_enabled.set()
         self._open_error: Optional[str] = None
 
-    def _make_callback(self, audio_queue: queue.SimpleQueue):
+    def _make_callback(self, audio_queue: queue.SimpleQueue, label: str):
         import pyaudiowpatch as pyaudio
 
         def _callback(in_data, frame_count, time_info, status_flags):
@@ -361,7 +363,12 @@ class WindowsRecorder:
                 self._open_error = f"录音流状态异常：{status_flags}"
             if self._stopped.is_set():
                 return in_data, pyaudio.paComplete
-            audio_queue.put(in_data)
+            # 暂停外录时继续写入等长静音，保持麦克风轨与系统内声的
+            # 时间轴严格对齐；直接停止流或丢弃块会让恢复后的发言前移。
+            if label == "mic" and not self._mic_enabled.is_set():
+                audio_queue.put(bytes(len(in_data)))
+            else:
+                audio_queue.put(in_data)
             return in_data, pyaudio.paContinue
 
         return _callback
@@ -421,7 +428,7 @@ class WindowsRecorder:
                 format=pyaudio.paInt16, channels=channels, rate=rate, input=True,
                 input_device_index=int(dev["index"]),
                 frames_per_buffer=_BLOCK_FRAMES,
-                stream_callback=self._make_callback(audio_queue),
+                stream_callback=self._make_callback(audio_queue, "system"),
             )
         except Exception:
             writer.close()
@@ -446,7 +453,7 @@ class WindowsRecorder:
                 format=pyaudio.paInt16, channels=channels, rate=rate, input=True,
                 input_device_index=dev_idx,
                 frames_per_buffer=_BLOCK_FRAMES,
-                stream_callback=self._make_callback(audio_queue),
+                stream_callback=self._make_callback(audio_queue, "mic"),
             )
         except Exception:
             writer.close()
@@ -474,6 +481,17 @@ class WindowsRecorder:
         self._stopped.set()
         self._cleanup()
         return self._specs
+
+    def set_mic_enabled(self, enabled: bool) -> None:
+        """录制过程中启停麦克风写入；系统内录始终保持运行。"""
+        if enabled:
+            self._mic_enabled.set()
+        else:
+            self._mic_enabled.clear()
+
+    @property
+    def mic_enabled(self) -> bool:
+        return self._mic_enabled.is_set()
 
     def _cleanup(self) -> None:
         # PyAudio 的回调运行在原生音频线程中。必须先停止并关闭全部流，

@@ -21,7 +21,7 @@ def test_home_contains_guide_changelog_and_version():
 
     assert 'id="guideOverlay"' in html
     assert 'id="changelogOverlay"' in html
-    assert "v0.1.7" in html
+    assert "v0.1.8" in html
     assert 'data-view-panel="minutes"' in html
 
 
@@ -79,6 +79,19 @@ def test_windows_microphone_test_and_default_device_label_are_wired():
     assert 'automaticGroup.label = "自动选择"' in javascript
     assert 'deviceGroup.label = "固定设备"' in javascript
     assert ".filter((name) => name !== defaultMicrophone" not in javascript
+
+
+def test_recording_console_has_live_external_mic_toggle():
+    html = (WEBUI / "index.html").read_text(encoding="utf-8")
+    javascript = (WEBUI / "app.js").read_text(encoding="utf-8")
+    css = (WEBUI / "styles.css").read_text(encoding="utf-8")
+
+    assert 'id="btnMicCapture"' in html
+    assert 'id="micCaptureLabel"' in html
+    assert 'id="micCaptureState"' in html
+    assert "set_mic_capture_enabled" in javascript
+    assert "会议内声继续录制" in javascript
+    assert ".mic-capture-button.muted" in css
 
 
 def test_minutes_editor_exposes_post_meeting_speaker_mapping():
@@ -143,12 +156,12 @@ def test_release_builds_embed_version_metadata():
     assert '--version-file assets\\version_info.txt' in workflow
     assert '--version-file assets\\version_info.txt' in windows_script
     for content in (workflow, macos_script):
-        assert "Set :CFBundleShortVersionString 0.1.7" in content
-        assert "Set :CFBundleVersion 0.1.7" in content
-    assert "filevers=(0, 1, 7, 0)" in windows_version
-    assert "prodvers=(0, 1, 7, 0)" in windows_version
-    assert "StringStruct('FileVersion', '0.1.7')" in windows_version
-    assert "StringStruct('ProductVersion', '0.1.7')" in windows_version
+        assert "Set :CFBundleShortVersionString 0.1.8" in content
+        assert "Set :CFBundleVersion 0.1.8" in content
+    assert "filevers=(0, 1, 8, 0)" in windows_version
+    assert "prodvers=(0, 1, 8, 0)" in windows_version
+    assert "StringStruct('FileVersion', '0.1.8')" in windows_version
+    assert "StringStruct('ProductVersion', '0.1.8')" in windows_version
 
 
 def test_windows_release_uses_native_certificate_store():

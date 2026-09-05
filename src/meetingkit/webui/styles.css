@@ -372,6 +372,7 @@ svg { width: 1.2em; height: 1.2em; fill: none; stroke: currentColor; stroke-widt
 @keyframes wave { to { height: 18%; opacity: .45; } }
 .capture-timer { margin-top: 2px; color: #fff; font: 750 34px/1.1 var(--mono); letter-spacing: -.04em; }
 .capture-console > p { max-width: 420px; min-height: 20px; margin: 7px auto 12px; color: #8995b2; text-align: center; font-size: 10px; }
+.capture-actions { display: flex; align-items: center; justify-content: center; gap: 22px; }
 .record-button { display: flex; align-items: center; gap: 13px; padding: 0; color: #fff; background: transparent; border: 0; }
 .record-button > span { width: 48px; height: 48px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #ff727d, var(--coral)); border-radius: 50%; box-shadow: 0 0 0 8px rgba(240,84,98,.11), 0 10px 22px rgba(240,84,98,.24); transition: .18s ease; }
 .record-button:hover > span { transform: scale(1.04); }
@@ -382,6 +383,20 @@ svg { width: 1.2em; height: 1.2em; fill: none; stroke: currentColor; stroke-widt
 .record-button.recording > span { animation: recordPulse 1.6s infinite; }
 @keyframes recordPulse { 50% { box-shadow: 0 0 0 18px rgba(240,84,98,0), 0 12px 25px rgba(240,84,98,.26); } }
 .record-button b { font-size: 13px; }
+.mic-capture-button { min-width: 144px; min-height: 44px; padding: 6px 10px 6px 7px; display: flex; align-items: center; gap: 9px; color: #d9f8fb; background: rgba(33,185,199,.1); border: 1px solid rgba(53,205,218,.28); border-radius: 12px; text-align: left; transition: .18s ease; }
+.mic-capture-button:hover:not(:disabled) { background: rgba(33,185,199,.17); border-color: rgba(75,222,233,.5); transform: translateY(-1px); }
+.mic-capture-button:focus-visible { outline: 3px solid rgba(96,224,235,.22); outline-offset: 2px; }
+.mic-capture-icon { width: 31px; height: 31px; flex: none; display: grid; place-items: center; color: var(--cyan); background: rgba(32,190,202,.12); border-radius: 9px; }
+.mic-capture-icon svg { width: 18px; height: 18px; }
+.mic-capture-icon svg path:last-child { opacity: 0; }
+.mic-capture-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mic-capture-copy b { color: inherit; font-size: 10px; line-height: 1.15; }
+.mic-capture-copy small { color: #8795b7; font-size: 7.5px; line-height: 1.2; white-space: nowrap; }
+.mic-capture-button.muted { color: #ffd8dc; background: rgba(240,84,98,.13); border-color: rgba(255,118,130,.4); }
+.mic-capture-button.muted:hover:not(:disabled) { background: rgba(240,84,98,.2); border-color: rgba(255,135,145,.58); }
+.mic-capture-button.muted .mic-capture-icon { color: #ff7d88; background: rgba(240,84,98,.14); }
+.mic-capture-button.muted .mic-capture-icon svg path:last-child { opacity: 1; }
+.mic-capture-button.muted .mic-capture-copy small { color: #d79aa3; }
 .console-meta { align-self: stretch; margin-top: auto; padding-top: 12px; display: flex; justify-content: center; gap: 22px; color: #7783a2; border-top: 1px solid rgba(255,255,255,.08); font-size: 9px; }
 .console-meta span { display: flex; align-items: center; gap: 6px; }
 .console-meta i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }.console-meta i.red { color: var(--coral); }.console-meta i.cyan { color: var(--cyan); }.console-meta i.violet { color: #837aff; }
