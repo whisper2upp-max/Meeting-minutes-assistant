@@ -2,7 +2,7 @@
 
 > 会议纪要助手：同步录制会议内声与麦克风，或导入已有音视频，自动完成说话人分离、全文转写和结构化会议纪要。
 
-[![Version](https://img.shields.io/badge/version-0.1.8-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.1.9-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-18213d.svg)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0aa6b5.svg)
 
@@ -33,6 +33,7 @@
 - 在应用内直接编辑 Markdown 纪要，包含标题、列表、引用和可增删行列的表格。
 - 使用可视化标签维护本场及常用参会人；会后根据样例发言一键匹配“说话人1、2…”，并同步更新转写和纪要标签。
 - 会议音频、转写稿和纪要按会议分文件夹保存，支持断点续跑与历史管理。
+- 在纪要编辑页按需清理音频：可仅删除当前会议原始双轨并保留混合音频，也可删除当前或全部历史会议的所有程序音频；文字资料始终保留。
 
 ## 一致的会议工作流
 
@@ -64,6 +65,8 @@
 
 编辑器会将可视内容序列化回 Markdown；导出文件可被常见 Markdown 阅读器正确渲染。点击“匹配参会人”可根据样例发言确认每个说话人的姓名，匹配结果按会议保存。历史列表支持搜索、滚动和删除整个会议文件夹；删除前会明确确认影响范围。
 
+点击“清理音频”可查看当前会议与全部历史会议占用的音频空间。推荐在确认转写和纪要无误后删除 `track_system.wav` 与 `track_mic.wav`，仅保留混合后的 `audio.wav`；也可以只删除某场会议或全部历史会议的所有程序音频。音频清理不会删除纪要、完整转写、JSON 或会议文件夹。
+
 ## 首次使用
 
 1. 在阿里云百炼中创建 API Key。
@@ -84,6 +87,8 @@ Windows v0.1.4 修复默认麦克风可能录到静音的问题；设备列表�
 Windows v0.1.5 增加当前麦克风实时回听测试，并在默认选项中标出实际设备；同时修复自定义输出目录只能打开其 Documents 父级的问题。
 
 Windows v0.1.6 恢复始终可见的系统默认麦克风项，将自动选择与固定设备分组；耳返改用稳定的实时读取链路并显示输入音量。纪要编辑器同时新增会后参会人匹配。
+
+Windows v0.1.9 将自动模式明确标为“电脑默认外录”：未插耳机时自动使用 Windows 默认输入（通常为电脑内置麦克风），插入耳机后跟随默认耳机麦克风；也可在下方固定指定某个设备。
 
 ## 数据与隐私
 

@@ -21,7 +21,7 @@ def test_home_contains_guide_changelog_and_version():
 
     assert 'id="guideOverlay"' in html
     assert 'id="changelogOverlay"' in html
-    assert "v0.1.8" in html
+    assert "v0.1.9" in html
     assert 'data-view-panel="minutes"' in html
 
 
@@ -39,6 +39,22 @@ def test_editor_has_complete_heading_table_and_delete_controls():
     assert "normalizeLegacyTableLines" in javascript
     assert 'tableLines.join("\\n")' in javascript
     assert "overflow-y: scroll" in css
+
+
+def test_audio_cleanup_controls_cover_safe_per_session_and_global_scopes():
+    html = (WEBUI / "index.html").read_text(encoding="utf-8")
+    javascript = (WEBUI / "app.js").read_text(encoding="utf-8")
+    css = (WEBUI / "styles.css").read_text(encoding="utf-8")
+
+    assert 'id="btnAudioCleanup"' in html
+    assert 'id="audioCleanupOverlay"' in html
+    assert 'data-audio-cleanup-scope="session_raw"' in html
+    assert 'data-audio-cleanup-scope="session_all"' in html
+    assert 'data-audio-cleanup-scope="all_sessions"' in html
+    assert "get_audio_cleanup_info" in javascript
+    assert "cleanup_audio" in javascript
+    assert "音频删除后无法恢复" in javascript
+    assert ".audio-cleanup-option.selected" in css
 
 
 def test_record_and_import_share_compact_progress_stack():
@@ -73,11 +89,14 @@ def test_windows_microphone_test_and_default_device_label_are_wired():
     assert 'id="btnMicTest"' in html
     assert 'id="micTestStatus"' in html
     assert 'id="micTestLevel"' in html
+    assert 'id="micRouteHint"' in html
     assert "start_mic_test" in javascript
     assert "stop_mic_test" in javascript
-    assert "系统默认（推荐，当前：" in javascript
-    assert 'automaticGroup.label = "自动选择"' in javascript
-    assert 'deviceGroup.label = "固定设备"' in javascript
+    assert "电脑默认外录（推荐，当前：" in javascript
+    assert 'automaticGroup.label = isWindows ? "自动跟随" : "自动选择"' in javascript
+    assert 'deviceGroup.label = "固定指定麦克风"' in javascript
+    assert "未插耳机通常使用电脑内置麦克风" in javascript
+    assert "插入耳机后自动跟随耳机麦克风" in javascript
     assert ".filter((name) => name !== defaultMicrophone" not in javascript
 
 
@@ -156,12 +175,12 @@ def test_release_builds_embed_version_metadata():
     assert '--version-file assets\\version_info.txt' in workflow
     assert '--version-file assets\\version_info.txt' in windows_script
     for content in (workflow, macos_script):
-        assert "Set :CFBundleShortVersionString 0.1.8" in content
-        assert "Set :CFBundleVersion 0.1.8" in content
-    assert "filevers=(0, 1, 8, 0)" in windows_version
-    assert "prodvers=(0, 1, 8, 0)" in windows_version
-    assert "StringStruct('FileVersion', '0.1.8')" in windows_version
-    assert "StringStruct('ProductVersion', '0.1.8')" in windows_version
+        assert "Set :CFBundleShortVersionString 0.1.9" in content
+        assert "Set :CFBundleVersion 0.1.9" in content
+    assert "filevers=(0, 1, 9, 0)" in windows_version
+    assert "prodvers=(0, 1, 9, 0)" in windows_version
+    assert "StringStruct('FileVersion', '0.1.9')" in windows_version
+    assert "StringStruct('ProductVersion', '0.1.9')" in windows_version
 
 
 def test_windows_release_uses_native_certificate_store():

@@ -240,6 +240,157 @@ def test_status_includes_application_version():
     assert server.Api().get_status()["version"] == server.__version__
 
 
+def test_audio_cleanup_info_reports_current_and_all_sessions(tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    current = output / "2026-09-05_0900_三轨会议"
+    other = output / "2026-09-05_1000_未完成会议"
+    current.mkdir(parents=True)
+    other.mkdir()
+    minutes = current / server.pipeline_mod.MINUTES_MD
+    minutes.write_text("# 三轨会议", encoding="utf-8")
+    (current / "track_system.wav").write_bytes(b"s" * 11)
+    (current / "track_mic.wav").write_bytes(b"m" * 13)
+    (current / "audio.wav").write_bytes(b"a" * 17)
+    (other / "audio.wav").write_bytes(b"o" * 19)
+    monkeypatch.setattr(server._state, "cfg", Config(output_dir=str(output)))
+    monkeypatch.setattr(server._state, "phase", "idle")
+
+    result = server.Api().get_audio_cleanup_info(str(minutes))
+
+    assert result["ok"] is True
+    assert result["current"]["session_name"] == current.name
+    assert result["current"]["mixed_exists"] is True
+    assert result["current"]["raw"] == {
+        "files": ["track_system.wav", "track_mic.wav"],
+        "count": 2,
+        "bytes": 24,
+    }
+    assert result["current"]["all"]["count"] == 3
+    assert result["current"]["all"]["bytes"] == 41
+    assert result["all_sessions"] == {"sessions": 2, "count": 4, "bytes": 60}
+
+
+def test_cleanup_current_raw_tracks_preserves_mixed_audio_and_documents(tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    session = output / "2026-09-05_0900_保留混音"
+    session.mkdir(parents=True)
+    minutes = session / server.pipeline_mod.MINUTES_MD
+    minutes.write_text("# 保留混音", encoding="utf-8")
+    transcript = session / server.pipeline_mod.TRANSCRIPT_MD
+    transcript.write_text("完整转写", encoding="utf-8")
+    metadata = session / server.pipeline_mod.SESSION_META_JSON
+    metadata.write_text("{}", encoding="utf-8")
+    (session / "track_system.wav").write_bytes(b"system")
+    (session / "track_mic.wav").write_bytes(b"microphone")
+    mixed = session / "audio.wav"
+    mixed.write_bytes(b"mixed")
+    monkeypatch.setattr(server._state, "cfg", Config(output_dir=str(output)))
+    monkeypatch.setattr(server._state, "phase", "idle")
+
+    result = server.Api().cleanup_audio("session_raw", str(minutes))
+
+    assert result["ok"] is True
+    assert result["deleted_files"] == 2
+    assert result["freed_bytes"] == len(b"system") + len(b"microphone")
+    assert not (session / "track_system.wav").exists()
+    assert not (session / "track_mic.wav").exists()
+    assert mixed.read_bytes() == b"mixed"
+    assert minutes.exists()
+    assert transcript.exists()
+    assert metadata.exists()
+
+
+def test_cleanup_raw_tracks_requires_mixed_audio(tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    session = output / "2026-09-05_0900_缺少混音"
+    session.mkdir(parents=True)
+    minutes = session / server.pipeline_mod.MINUTES_MD
+    minutes.write_text("# 缺少混音", encoding="utf-8")
+    raw = session / "track_mic.wav"
+    raw.write_bytes(b"must-stay")
+    monkeypatch.setattr(server._state, "cfg", Config(output_dir=str(output)))
+    monkeypatch.setattr(server._state, "phase", "idle")
+
+    result = server.Api().cleanup_audio("session_raw", str(minutes))
+
+    assert result["ok"] is False
+    assert "audio.wav 不存在" in result["error"]
+    assert raw.read_bytes() == b"must-stay"
+
+
+def test_cleanup_current_all_audio_preserves_session_and_user_files(tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    session = output / "2026-09-05_0930_清理单场"
+    session.mkdir(parents=True)
+    minutes = session / server.pipeline_mod.MINUTES_MD
+    minutes.write_text("# 清理单场", encoding="utf-8")
+    transcript = session / server.pipeline_mod.TRANSCRIPT_MD
+    transcript.write_text("完整转写", encoding="utf-8")
+    for name in server.pipeline_mod.SESSION_AUDIO_FILES:
+        (session / name).write_bytes(name.encode("utf-8"))
+    user_audio = session / "补充录音.wav"
+    user_audio.write_bytes(b"user-owned")
+    monkeypatch.setattr(server._state, "cfg", Config(output_dir=str(output)))
+    monkeypatch.setattr(server._state, "phase", "idle")
+
+    result = server.Api().cleanup_audio("session_all", str(minutes))
+
+    assert result["ok"] is True
+    assert result["deleted_files"] == 3
+    assert session.is_dir()
+    assert minutes.exists()
+    assert transcript.exists()
+    assert user_audio.read_bytes() == b"user-owned"
+    assert all(not (session / name).exists()
+               for name in server.pipeline_mod.SESSION_AUDIO_FILES)
+
+
+def test_cleanup_all_sessions_only_removes_managed_audio_files(tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    first = output / "2026-09-05_0900_会议一"
+    second = output / "2026-09-05_1000_会议二"
+    nested = output / "group" / "nested"
+    first.mkdir(parents=True)
+    second.mkdir()
+    nested.mkdir(parents=True)
+    for session in (first, second):
+        (session / "audio.wav").write_bytes(b"mixed")
+        (session / "track_mic.wav").write_bytes(b"mic")
+        (session / "notes.json").write_text("{}", encoding="utf-8")
+        (session / "user-recording.wav").write_bytes(b"user")
+    (nested / "audio.wav").write_bytes(b"nested-must-stay")
+    monkeypatch.setattr(server._state, "cfg", Config(output_dir=str(output)))
+    monkeypatch.setattr(server._state, "phase", "idle")
+
+    result = server.Api().cleanup_audio("all_sessions")
+
+    assert result["ok"] is True
+    assert result["affected_sessions"] == 2
+    assert result["deleted_files"] == 4
+    for session in (first, second):
+        assert not (session / "audio.wav").exists()
+        assert not (session / "track_mic.wav").exists()
+        assert (session / "notes.json").exists()
+        assert (session / "user-recording.wav").read_bytes() == b"user"
+    assert (nested / "audio.wav").read_bytes() == b"nested-must-stay"
+
+
+def test_audio_cleanup_is_blocked_while_recording(tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    session = output / "2026-09-05_0900_录制中"
+    session.mkdir(parents=True)
+    audio = session / "audio.wav"
+    audio.write_bytes(b"active")
+    monkeypatch.setattr(server._state, "cfg", Config(output_dir=str(output)))
+    monkeypatch.setattr(server._state, "phase", "recording")
+
+    result = server.Api().cleanup_audio("all_sessions")
+
+    assert result["ok"] is False
+    assert "录音或处理进行中" in result["error"]
+    assert audio.read_bytes() == b"active"
+
+
 def test_delete_session_removes_the_complete_meeting_folder(tmp_path, monkeypatch):
     output = tmp_path / "output"
     session = output / "2026-08-30_0900_删除测试"

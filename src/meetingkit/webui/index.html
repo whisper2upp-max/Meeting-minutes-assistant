@@ -29,7 +29,7 @@
       <button class="status-chip" id="statusChip" type="button">
         <span class="status-dot"></span><span id="statusText">本机就绪</span>
       </button>
-      <span class="version-chip" id="versionChip">v0.1.8</span>
+      <span class="version-chip" id="versionChip">v0.1.9</span>
       <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
         <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
       </button>
@@ -114,7 +114,7 @@
         <button class="shortcut-card release" id="btnChangelog" type="button">
           <span class="shortcut-index">04</span>
           <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
-          <strong>更新日志</strong><small>v0.1.8 · 录制中随时暂停外录</small><i>查看变化 →</i>
+          <strong>更新日志</strong><small>v0.1.9 · 按需清理会议音频</small><i>查看变化 →</i>
         </button>
       </div>
 
@@ -158,7 +158,8 @@
           <div class="field" id="systemField"><label for="systemSelect">会议内声</label><select id="systemSelect"><option value="">正在检测系统声源…</option></select></div>
           <div class="field">
             <label for="micSelect">麦克风 <button class="inline-button" id="btnRefresh" type="button">刷新设备</button></label>
-            <select id="micSelect"></select>
+            <select id="micSelect" aria-describedby="micRouteHint"></select>
+            <p class="mic-route-hint" id="micRouteHint">电脑默认外录会在开始录制时自动使用当前默认麦克风。</p>
             <div class="mic-test-row hidden" id="micTestRow">
               <button class="mic-test-button" id="btnMicTest" type="button" aria-pressed="false"><span></span><b>测试麦克风</b></button>
               <div class="mic-test-feedback">
@@ -247,6 +248,7 @@
           <span class="save-state" id="saveState"><i></i> 未选择纪要</span>
           <button class="button secondary compact" id="btnSpeakerMapping" type="button" disabled>匹配参会人</button>
           <button class="button secondary compact" id="btnTranscript" type="button" disabled>查看转写</button>
+          <button class="button secondary compact" id="btnAudioCleanup" type="button" disabled>清理音频</button>
           <button class="button secondary compact" id="btnOpenFolder" type="button" disabled>打开文件夹</button>
           <button class="button secondary compact" id="btnExport" type="button" disabled>导出</button>
           <button class="button primary compact" id="btnSaveMinutes" type="button" disabled>保存纪要</button>
@@ -351,7 +353,7 @@
         <article><b>01</b><div><h3>配置百炼 API</h3><p>点击右上角设置，填写 API Key。公司有专属网关时再填写 API Host。</p></div></article>
         <article><b>02</b><div><h3>选择方式与详细程度</h3><p>实时会议使用“会议录制”，已有音视频使用“导入生成”；开始前选择简要、标准或详细档。</p></div></article>
         <article><b>03</b><div><h3>添加参会人并处理</h3><p>用姓名标签添加本场参会人；录制中如需旁聊，可暂停麦克风外录而不中断会议内声。程序随后依次完成上传、转写和纪要生成。</p></div></article>
-        <article><b>04</b><div><h3>编辑、匹配与重生成</h3><p>在纪要工作区校对内容、匹配说话人；也可换档重新生成而不重复转写，旧稿会自动备份。</p></div></article>
+        <article><b>04</b><div><h3>编辑、匹配与管理存储</h3><p>在纪要工作区校对内容、匹配说话人、换档重新生成；确认结果后可按会议清理原始双轨或全部音频。</p></div></article>
       </div>
       <div class="guide-tip"><strong>隐私提示</strong><span>会议音频和结果默认保存在本机；转写时音频会临时上传到配置的百炼服务。</span></div>
       <div class="modal-foot"><button class="button primary" data-close="guideOverlay" type="button">知道了</button></div>
@@ -360,9 +362,12 @@
 
   <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
     <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.8</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
-      <div class="release-hero"><span>0.1.8</span><div><strong>录制中随时暂停麦克风外录</strong><small>2026-09-05 · Recording control</small></div></div>
+      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.9</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
+      <div class="release-hero"><span>0.1.9</span><div><strong>按需清理会议音频</strong><small>2026-09-05 · Storage management</small></div></div>
       <div class="release-list">
+        <article><span>NEW</span><div><h3>三种音频清理范围</h3><p>可仅删除当前会议原始双轨并保留混合音频，也可删除当前会议或全部历史会议的所有程序音频。</p></div></article>
+        <article><span>SAFE</span><div><h3>文字资料始终保留</h3><p>清理只识别程序生成的三个固定音频文件，不会删除纪要、完整转写、JSON、会议文件夹或用户自行添加的文件。</p></div></article>
+        <article><span>IMPROVED</span><div><h3>清理前统计空间</h3><p>选择范围前显示涉及场次、文件数量和预计释放空间；录音或处理进行中自动禁止清理。</p></div></article>
         <article><span>NEW</span><div><h3>会议内声不断，旁聊不入稿</h3><p>录制中可独立暂停或恢复麦克风外录；暂停区间写入等长静音，既隔离身边对话，也保持双轨时间轴准确。</p></div></article>
         <article><span>NEW</span><div><h3>简要、标准、详细三档纪要</h3><p>录制和导入前即可选择；标准档保留背景与主要观点，详细档补充讨论脉络、分歧和决策依据。</p></div></article>
         <article><span>NEW</span><div><h3>会后切档重新生成</h3><p>直接使用已保存的完整转写重新生成，不重复上传音频；覆盖前会把当前纪要备份到本场会议目录。</p></div></article>
@@ -401,6 +406,29 @@
       <div class="speaker-map-rows" id="speakerMapRows"></div>
       <datalist id="speakerCandidates"></datalist>
       <div class="modal-foot"><button class="button secondary" data-close="speakerOverlay" type="button">取消</button><button class="button primary" id="btnSaveSpeakerMapping" type="button">保存并应用</button></div>
+    </section>
+  </div>
+
+  <div class="overlay hidden" id="audioCleanupOverlay" role="dialog" aria-modal="true" aria-labelledby="audioCleanupTitle">
+    <section class="modal audio-cleanup-modal">
+      <div class="modal-head"><div><span class="eyebrow danger">AUDIO STORAGE</span><h2 id="audioCleanupTitle">清理会议音频</h2><p>释放本机空间，不删除纪要、完整转写或 JSON 数据。</p></div><button class="modal-close" data-close="audioCleanupOverlay" type="button">×</button></div>
+      <div class="audio-cleanup-summary">
+        <span><svg viewBox="0 0 24 24"><path d="M4 9v6M8 6v12M12 3v18M16 7v10M20 10v4"/></svg></span>
+        <div><strong id="audioCleanupCurrentTitle">正在读取音频存储…</strong><small id="audioCleanupSummary">请稍候</small></div>
+      </div>
+      <div class="audio-cleanup-options" role="radiogroup" aria-label="音频清理范围">
+        <button class="audio-cleanup-option" data-audio-cleanup-scope="session_raw" type="button" aria-pressed="false">
+          <i>01</i><span><strong>当前会议只删原始双轨 <em>推荐</em></strong><small>删除内录与麦克风轨，保留混合后的 audio.wav</small></span><b id="audioCleanupRawMeta">—</b>
+        </button>
+        <button class="audio-cleanup-option" data-audio-cleanup-scope="session_all" type="button" aria-pressed="false">
+          <i>02</i><span><strong>当前会议删除全部音频</strong><small>删除原始双轨及混合音频，其他会议资料保留</small></span><b id="audioCleanupSessionMeta">—</b>
+        </button>
+        <button class="audio-cleanup-option" data-audio-cleanup-scope="all_sessions" type="button" aria-pressed="false">
+          <i>03</i><span><strong>删除全部历史会议音频</strong><small>清理输出目录中所有会议的程序音频</small></span><b id="audioCleanupAllMeta">—</b>
+        </button>
+      </div>
+      <p class="audio-cleanup-guard" id="audioCleanupGuard">只会删除程序生成的 track_system.wav、track_mic.wav 和 audio.wav；此操作无法撤销。</p>
+      <div class="modal-foot"><button class="button secondary" data-close="audioCleanupOverlay" type="button">取消</button><button class="button danger" id="btnConfirmAudioCleanup" type="button" disabled>确认清理</button></div>
     </section>
   </div>
 

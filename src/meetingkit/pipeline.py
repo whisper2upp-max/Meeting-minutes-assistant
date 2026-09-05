@@ -28,6 +28,8 @@ from .prompt import DEFAULT_DETAIL_LEVEL, normalize_detail_level
 Progress = Callable[[str, str], None]
 
 AUDIO_WAV = "audio.wav"
+RAW_AUDIO_FILES = ("track_system.wav", "track_mic.wav")
+SESSION_AUDIO_FILES = (*RAW_AUDIO_FILES, AUDIO_WAV)
 TRANSCRIPT_JSON = "transcript.json"
 TRANSCRIPT_MD = "transcript.md"
 SPEAKER_MAP_JSON = "speaker_map.json"
