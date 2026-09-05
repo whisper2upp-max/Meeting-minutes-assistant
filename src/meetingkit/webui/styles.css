@@ -344,6 +344,7 @@ svg { width: 1.2em; height: 1.2em; fill: none; stroke: currentColor; stroke-widt
 .detail-picker label:has(input:checked) b { color: var(--indigo-dark); }
 .detail-picker label:has(input:focus-visible) { outline: 3px solid rgba(102, 92, 255, .15); }
 .detail-picker label:has(input:disabled) { opacity: .48; cursor: not-allowed; transform: none; }
+.mic-route-hint { margin: 7px 2px 0; color: #53617a; font-size: 8.8px; line-height: 1.55; }
 .mic-test-row { margin-top: 8px; padding: 9px 10px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; background: #f8f9fd; border: 1px solid var(--line); border-radius: 10px; }
 .mic-test-button { min-width: 92px; height: 30px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; color: var(--indigo); background: #fff; border: 1px solid #d8d4ff; border-radius: 8px; font-size: 9.5px; }
 .mic-test-button span { width: 7px; height: 7px; border-radius: 50%; background: #aeb6c7; }
@@ -520,6 +521,14 @@ body.minutes-mode { overflow: hidden; }
 .speaker-candidate i { width: 18px; height: 18px; display: grid; place-items: center; color: #fff; background: var(--indigo); border-radius: 5px; font: 750 7px/1 var(--mono); font-style: normal; }
 .speaker-candidate:hover, .speaker-candidate.selected { color: var(--indigo); background: var(--indigo-soft); border-color: #d3ceff; }
 .speaker-map-empty { padding: 38px 12px; color: var(--muted); text-align: center; font-size: 10.5px; }
+.audio-cleanup-modal { width: min(690px, 100%); }
+.audio-cleanup-summary { margin: 24px 26px 14px; padding: 15px 16px; display: flex; align-items: center; gap: 13px; color: #37415f; background: #f6f7fb; border: 1px solid var(--line); border-radius: 13px; }
+.audio-cleanup-summary > span { width: 40px; height: 40px; flex: none; display: grid; place-items: center; color: var(--indigo); background: var(--indigo-soft); border-radius: 11px; }.audio-cleanup-summary svg { width: 21px; height: 21px; }.audio-cleanup-summary div { min-width: 0; display: flex; flex-direction: column; }.audio-cleanup-summary strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.audio-cleanup-summary small { margin-top: 3px; color: var(--muted); font-size: 9px; }
+.audio-cleanup-options { padding: 0 26px; display: flex; flex-direction: column; gap: 8px; }
+.audio-cleanup-option { width: 100%; min-height: 68px; padding: 11px 13px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 11px; align-items: center; text-align: left; color: var(--ink-2); background: #fff; border: 1px solid var(--line-dark); border-radius: 12px; transition: .16s ease; }
+.audio-cleanup-option:hover:not(:disabled) { border-color: #bdb6ff; background: #fbfaff; }.audio-cleanup-option.selected { border-color: var(--indigo); background: var(--indigo-soft); box-shadow: 0 0 0 3px rgba(102,92,255,.08); }.audio-cleanup-option:disabled { opacity: .45; cursor: not-allowed; }
+.audio-cleanup-option > i { width: 32px; height: 32px; display: grid; place-items: center; color: var(--indigo); background: #eeecff; border-radius: 9px; font: 800 8px/1 var(--mono); font-style: normal; }.audio-cleanup-option > span { min-width: 0; display: flex; flex-direction: column; }.audio-cleanup-option > span strong { font-size: 10.5px; }.audio-cleanup-option > span small { margin-top: 3px; color: var(--muted); font-size: 8.5px; line-height: 1.45; }.audio-cleanup-option > b { color: var(--indigo); font: 750 8px/1.3 var(--mono); white-space: nowrap; }.audio-cleanup-option em { margin-left: 5px; padding: 2px 5px; color: #287b62; background: var(--emerald-soft); border-radius: 5px; font: 750 7px/1 var(--mono); font-style: normal; }
+.audio-cleanup-guard { min-height: 37px; margin: 14px 26px 0; padding: 10px 12px; color: #92505a; background: var(--coral-soft); border: 1px solid #f5cdd1; border-radius: 9px; font-size: 9px; line-height: 1.65; }
 .eyebrow.danger { color: #b93240; }
 .delete-modal { width: min(570px, 100%); }
 .delete-warning { margin: 25px 27px 16px; padding: 16px; display: flex; align-items: center; gap: 13px; color: #91313b; background: var(--coral-soft); border: 1px solid #f5c7cc; border-radius: 13px; }

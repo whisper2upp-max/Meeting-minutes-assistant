@@ -16,6 +16,9 @@ const state = {
   logCount: 0,
   handledResult: null,
   pendingDeleteSession: null,
+  audioCleanupInfo: null,
+  audioCleanupScope: "",
+  audioCleanupPath: "",
   speakerMapping: {},
   attendees: { record: [], import: [], settings: [] },
   attendeeSuggestions: [],
@@ -51,6 +54,20 @@ function formatTime(seconds) {
   const mm = String(minutes).padStart(2, "0");
   const ss = String(secs).padStart(2, "0");
   return hours ? `${String(hours).padStart(2, "0")}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+function formatBytes(bytes) {
+  const value = Math.max(0, Number(bytes) || 0);
+  if (value < 1024) return `${Math.round(value)} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let size = value / 1024;
+  let index = 0;
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024;
+    index += 1;
+  }
+  const digits = size >= 100 ? 0 : size >= 10 ? 1 : 2;
+  return `${size.toFixed(digits)} ${units[index]}`;
 }
 
 function basename(path) {
@@ -454,19 +471,23 @@ async function loadDevices() {
     const defaultMicrophone = result.devices?.default_microphone || "";
     const defaultLabel = isWindows
       ? defaultMicrophone
-        ? `系统默认（推荐，当前：${defaultMicrophone}）`
-        : "系统默认（推荐，自动跟随 Windows）"
+        ? `电脑默认外录（推荐，当前：${defaultMicrophone}）`
+        : "电脑默认外录（推荐，自动跟随 Windows）"
       : "系统默认麦克风";
     const automaticGroup = document.createElement("optgroup");
-    automaticGroup.label = "自动选择";
+    automaticGroup.label = isWindows ? "自动跟随" : "自动选择";
     automaticGroup.append(new Option(defaultLabel, "", false, !config.microphone));
     const deviceGroup = document.createElement("optgroup");
-    deviceGroup.label = "固定设备";
+    deviceGroup.label = "固定指定麦克风";
     microphones.forEach((name) => {
-      const label = isWindows && name === defaultMicrophone ? `${name}（当前默认设备）` : name;
+      const label = isWindows && name === defaultMicrophone ? `${name}（当前默认，可固定）` : name;
       deviceGroup.append(new Option(label, name, false, config.microphone === name));
     });
-    $("micSelect").replaceChildren(automaticGroup, deviceGroup);
+    const micSelect = $("micSelect");
+    micSelect.replaceChildren(automaticGroup, deviceGroup);
+    micSelect.dataset.isWindows = isWindows ? "true" : "false";
+    micSelect.dataset.defaultMicrophone = defaultMicrophone;
+    updateMicRouteHint();
     $("systemSelect").replaceChildren(new Option(
       isWindows ? "系统默认输出设备（WASAPI 自动内录）" : "自动检测 BlackHole",
       "",
@@ -478,6 +499,22 @@ async function loadDevices() {
   } catch (error) {
     toast(`设备刷新失败：${error}`);
   }
+}
+
+function updateMicRouteHint() {
+  const micSelect = $("micSelect");
+  const hint = $("micRouteHint");
+  if (micSelect.dataset.isWindows !== "true") {
+    hint.textContent = "未固定设备时，外录使用系统当前默认麦克风。";
+    return;
+  }
+  if (micSelect.value) {
+    hint.textContent = `当前固定使用“${micSelect.value}”；拔出该设备后需要重新选择。想自动使用电脑内置或耳机麦克风，请选择“电脑默认外录”。`;
+    return;
+  }
+  const current = micSelect.dataset.defaultMicrophone;
+  const suffix = current ? ` 当前识别为“${current}”。` : "";
+  hint.textContent = `电脑默认外录会在每次开始录制时读取 Windows 当前默认输入：未插耳机通常使用电脑内置麦克风，插入耳机后自动跟随耳机麦克风。${suffix}`;
 }
 
 async function stopMicTest(silent = false) {
@@ -1028,6 +1065,126 @@ async function exportMinutes() {
   else if (result.error !== "未选择导出目录") toast(result.error);
 }
 
+function renderAudioCleanup(info) {
+  state.audioCleanupInfo = info;
+  const current = info.current;
+  const allSessions = info.all_sessions || { sessions: 0, count: 0, bytes: 0 };
+  $("audioCleanupCurrentTitle").textContent = current
+    ? sessionTitle({ name: current.session_name })
+    : "未选择具体会议";
+  $("audioCleanupSummary").textContent = current
+    ? current.all.count
+      ? `当前会议 ${current.all.count} 个音频，共 ${formatBytes(current.all.bytes)}`
+      : "当前会议已没有可清理的程序音频"
+    : `仍可清理全部历史会议：${allSessions.sessions} 场，共 ${formatBytes(allSessions.bytes)}`;
+
+  $("audioCleanupRawMeta").textContent = current?.raw?.count
+    ? `${current.raw.count} 个 · ${formatBytes(current.raw.bytes)}`
+    : "无原始双轨";
+  $("audioCleanupSessionMeta").textContent = current?.all?.count
+    ? `${current.all.count} 个 · ${formatBytes(current.all.bytes)}`
+    : "无可清理音频";
+  $("audioCleanupAllMeta").textContent = allSessions.count
+    ? `${allSessions.sessions} 场 · ${formatBytes(allSessions.bytes)}`
+    : "无需清理";
+
+  const availability = {
+    session_raw: Boolean(current?.mixed_exists && current?.raw?.count),
+    session_all: Boolean(current?.all?.count),
+    all_sessions: Boolean(allSessions.count),
+  };
+  if (!availability[state.audioCleanupScope]) {
+    state.audioCleanupScope = ["session_raw", "session_all", "all_sessions"]
+      .find((scope) => availability[scope]) || "";
+  }
+  qa("[data-audio-cleanup-scope]").forEach((button) => {
+    const scope = button.dataset.audioCleanupScope;
+    button.disabled = !availability[scope];
+    button.classList.toggle("selected", scope === state.audioCleanupScope);
+    button.setAttribute("aria-pressed", String(scope === state.audioCleanupScope));
+  });
+
+  const labels = {
+    session_raw: "删除原始双轨",
+    session_all: "删除当前全部音频",
+    all_sessions: "删除全部会议音频",
+  };
+  const descriptions = {
+    session_raw: "将永久删除当前会议的内录和麦克风原始轨道；混合音频、完整转写、纪要和 JSON 均保留。",
+    session_all: "将永久删除当前会议的全部程序音频；完整转写、纪要、JSON 和会议文件夹均保留。",
+    all_sessions: "将永久删除输出目录中全部历史会议的程序音频；所有文字资料和会议文件夹均保留。",
+  };
+  $("audioCleanupGuard").textContent = info.busy
+    ? "录音或处理正在进行，完成后才能清理音频。"
+    : descriptions[state.audioCleanupScope] || "当前没有可清理的程序音频。";
+  $("btnConfirmAudioCleanup").textContent = info.busy
+    ? "任务进行中"
+    : labels[state.audioCleanupScope] || "确认清理";
+  $("btnConfirmAudioCleanup").disabled = Boolean(info.busy || !state.audioCleanupScope);
+}
+
+async function openAudioCleanup() {
+  if (!state.apiReady) return;
+  state.audioCleanupPath = state.activeMinutes || "";
+  state.audioCleanupScope = "";
+  $("audioCleanupCurrentTitle").textContent = "正在读取音频存储…";
+  $("audioCleanupSummary").textContent = "请稍候";
+  $("btnConfirmAudioCleanup").disabled = true;
+  openOverlay("audioCleanupOverlay");
+  try {
+    const result = await api().get_audio_cleanup_info(state.audioCleanupPath);
+    if (!result.ok) {
+      closeOverlay("audioCleanupOverlay");
+      return toast(result.error || "无法读取音频存储信息");
+    }
+    renderAudioCleanup(result);
+  } catch (error) {
+    closeOverlay("audioCleanupOverlay");
+    toast(`无法读取音频存储信息：${error}`);
+  }
+}
+
+function selectAudioCleanupScope(scope) {
+  const button = qa("[data-audio-cleanup-scope]")
+    .find((item) => item.dataset.audioCleanupScope === scope);
+  if (!button || button.disabled || !state.audioCleanupInfo) return;
+  state.audioCleanupScope = scope;
+  renderAudioCleanup(state.audioCleanupInfo);
+}
+
+async function confirmAudioCleanup() {
+  const scope = state.audioCleanupScope;
+  const info = state.audioCleanupInfo;
+  if (!scope || !info || !state.apiReady) return;
+  const current = info.current;
+  const allSessions = info.all_sessions || { sessions: 0, bytes: 0 };
+  const confirmations = {
+    session_raw: `确定删除“${sessionTitle({ name: current?.session_name })}”的原始双轨吗？\n\n预计释放 ${formatBytes(current?.raw?.bytes)}，混合音频和全部文字资料会保留。`,
+    session_all: `确定删除“${sessionTitle({ name: current?.session_name })}”的全部音频吗？\n\n预计释放 ${formatBytes(current?.all?.bytes)}，纪要、完整转写和 JSON 会保留。`,
+    all_sessions: `确定删除全部 ${allSessions.sessions} 场历史会议的音频吗？\n\n预计释放 ${formatBytes(allSessions.bytes)}，所有文字资料和会议文件夹会保留。`,
+  };
+  if (!window.confirm(`${confirmations[scope]}\n\n音频删除后无法恢复。`)) return;
+
+  const button = $("btnConfirmAudioCleanup");
+  button.disabled = true;
+  button.textContent = "正在清理…";
+  try {
+    const result = await api().cleanup_audio(scope, state.audioCleanupPath);
+    if (!result.ok) {
+      if (result.deleted_files) await loadSessions();
+      return toast(result.error || "音频清理失败");
+    }
+    closeOverlay("audioCleanupOverlay");
+    toast(`已删除 ${result.deleted_files} 个音频文件，释放 ${formatBytes(result.freed_bytes)}`);
+    await loadSessions();
+  } catch (error) {
+    toast(`音频清理失败：${error}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = "确认清理";
+  }
+}
+
 function requestDeleteSession(session) {
   state.pendingDeleteSession = session;
   $("deleteSessionName").textContent = sessionTitle(session);
@@ -1222,6 +1379,7 @@ function bindEvents() {
     await stopMicTest(true);
     await loadDevices();
   });
+  $("micSelect").addEventListener("change", updateMicRouteHint);
   $("btnMicTest").addEventListener("click", toggleMicTest);
   $("btnRecord").addEventListener("click", toggleRecording);
   $("btnMicCapture").addEventListener("click", toggleMicCapture);
@@ -1275,6 +1433,11 @@ function bindEvents() {
   $("btnRegenerateMinutes").addEventListener("click", regenerateMinutes);
   $("btnSpeakerMapping").addEventListener("click", openSpeakerMapping);
   $("btnSaveSpeakerMapping").addEventListener("click", saveSpeakerMapping);
+  $("btnAudioCleanup").addEventListener("click", openAudioCleanup);
+  qa("[data-audio-cleanup-scope]").forEach((button) => {
+    button.addEventListener("click", () => selectAudioCleanupScope(button.dataset.audioCleanupScope));
+  });
+  $("btnConfirmAudioCleanup").addEventListener("click", confirmAudioCleanup);
   $("btnExport").addEventListener("click", exportMinutes);
   $("btnOpenFolder").addEventListener("click", () => state.activeMinutes && api().reveal(state.activeMinutes));
   $("btnTranscript").addEventListener("click", () => state.transcriptPath && api().open_file(state.transcriptPath));
@@ -1319,6 +1482,7 @@ function bindEvents() {
 
 async function initializeDesktop() {
   state.apiReady = true;
+  $("btnAudioCleanup").disabled = false;
   await Promise.all([loadDevices(), loadSessions(), pollStatus()]);
   const config = await api().get_config();
   state.attendeeSuggestions = normalizeAttendeeNames(config.attendees || []);

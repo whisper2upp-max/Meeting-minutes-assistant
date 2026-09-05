@@ -485,6 +485,154 @@ class Api:
             raise RuntimeError("只能访问输出目录内的纪要文件")
         return p
 
+    def _session_from_minutes(self, path: str) -> Path:
+        """由纪要路径解析一场会议，并限制为输出根目录的直接子目录。"""
+        minutes = self._safe_minutes_path(path)
+        root = _state.cfg.resolved_output_dir().resolve()
+        session = minutes.parent.resolve()
+        if minutes.name != pipeline_mod.MINUTES_MD:
+            raise RuntimeError("只能通过会议纪要文件管理会议音频")
+        if session == root or session.parent != root:
+            raise RuntimeError("只能管理输出目录内的单个会议文件夹")
+        if not minutes.is_file() or not session.is_dir():
+            raise RuntimeError("会议记录不存在或已被移除")
+        return session
+
+    @staticmethod
+    def _audio_inventory(session: Path) -> dict:
+        """统计一场会议由程序生成的音频；忽略用户自行添加的其他文件。"""
+        files = []
+        for name in pipeline_mod.SESSION_AUDIO_FILES:
+            path = session / name
+            try:
+                if path.is_file():
+                    files.append({"name": name, "bytes": path.stat().st_size})
+            except OSError:
+                continue
+        raw = [item for item in files if item["name"] in pipeline_mod.RAW_AUDIO_FILES]
+        return {
+            "session": str(session),
+            "session_name": session.name,
+            "mixed_exists": any(item["name"] == pipeline_mod.AUDIO_WAV for item in files),
+            "raw": {
+                "files": [item["name"] for item in raw],
+                "count": len(raw),
+                "bytes": sum(item["bytes"] for item in raw),
+            },
+            "all": {
+                "files": [item["name"] for item in files],
+                "count": len(files),
+                "bytes": sum(item["bytes"] for item in files),
+            },
+        }
+
+    def _audio_sessions(self) -> list[Path]:
+        """列出输出根目录内含项目音频的直接子目录，排除外部符号链接。"""
+        root = _state.cfg.resolved_output_dir().resolve()
+        if not root.is_dir():
+            return []
+        sessions = []
+        for candidate in root.iterdir():
+            try:
+                session = candidate.resolve()
+                if not candidate.is_dir() or session.parent != root:
+                    continue
+                if any((session / name).is_file()
+                       for name in pipeline_mod.SESSION_AUDIO_FILES):
+                    sessions.append(session)
+            except OSError:
+                continue
+        return sessions
+
+    def get_audio_cleanup_info(self, path: str = "") -> dict:
+        """返回当前会议与全部会议的可清理音频数量、体积和保护状态。"""
+        try:
+            current = None
+            if str(path or "").strip():
+                current = self._audio_inventory(self._session_from_minutes(path))
+            inventories = [self._audio_inventory(session)
+                           for session in self._audio_sessions()]
+            affected = [item for item in inventories if item["all"]["count"]]
+            return {
+                "ok": True,
+                "busy": _state.busy(),
+                "current": current,
+                "all_sessions": {
+                    "sessions": len(affected),
+                    "count": sum(item["all"]["count"] for item in affected),
+                    "bytes": sum(item["all"]["bytes"] for item in affected),
+                },
+            }
+        except Exception as exc:
+            return {"ok": False, "error": f"读取音频存储信息失败：{exc}"}
+
+    def cleanup_audio(self, scope: str, path: str = "") -> dict:
+        """删除受控范围内的项目音频，不触碰纪要、转写、JSON 或会议目录。"""
+        try:
+            if _state.busy():
+                return {"ok": False, "error": "录音或处理进行中，暂时不能清理音频"}
+            if scope not in {"session_raw", "session_all", "all_sessions"}:
+                raise RuntimeError("未知的音频清理范围")
+
+            targets: list[tuple[Path, Path]] = []
+            if scope in {"session_raw", "session_all"}:
+                session = self._session_from_minutes(path)
+                if scope == "session_raw":
+                    mixed = session / pipeline_mod.AUDIO_WAV
+                    if not mixed.is_file():
+                        raise RuntimeError("混合音频 audio.wav 不存在，不能删除原始双轨")
+                    names = pipeline_mod.RAW_AUDIO_FILES
+                else:
+                    names = pipeline_mod.SESSION_AUDIO_FILES
+                targets.extend((session, session / name) for name in names)
+            else:
+                for session in self._audio_sessions():
+                    targets.extend(
+                        (session, session / name)
+                        for name in pipeline_mod.SESSION_AUDIO_FILES
+                    )
+
+            deleted_files = 0
+            freed_bytes = 0
+            affected_sessions: set[Path] = set()
+            failures = []
+            for session, audio_path in targets:
+                try:
+                    if not audio_path.is_file():
+                        continue
+                    size = audio_path.stat().st_size
+                    audio_path.unlink()
+                    deleted_files += 1
+                    freed_bytes += size
+                    affected_sessions.add(session)
+                except OSError as exc:
+                    failures.append(f"{audio_path.name}: {exc}")
+
+            scope_label = {
+                "session_raw": "当前会议原始双轨",
+                "session_all": "当前会议全部音频",
+                "all_sessions": "全部会议音频",
+            }[scope]
+            _state.log(
+                f"音频清理｜{scope_label}：删除 {deleted_files} 个文件，"
+                f"释放 {freed_bytes / (1024 ** 2):.1f} MB"
+            )
+            result = {
+                "ok": not failures,
+                "scope": scope,
+                "deleted_files": deleted_files,
+                "freed_bytes": freed_bytes,
+                "affected_sessions": len(affected_sessions),
+            }
+            if failures:
+                result["error"] = (
+                    f"已删除 {deleted_files} 个文件，但有 {len(failures)} 个文件删除失败："
+                    + "；".join(failures[:3])
+                )
+            return result
+        except Exception as exc:
+            return {"ok": False, "error": f"音频清理失败：{exc}"}
+
     def get_minutes(self, path: str) -> dict:
         try:
             p = self._safe_minutes_path(path)
@@ -805,15 +953,7 @@ class Api:
         try:
             if _state.busy():
                 return {"ok": False, "error": "录音或处理进行中，暂时不能删除会议"}
-            minutes = self._safe_minutes_path(path)
-            root = _state.cfg.resolved_output_dir().resolve()
-            session = minutes.parent.resolve()
-            if minutes.name != pipeline_mod.MINUTES_MD:
-                raise RuntimeError("只能通过会议纪要文件删除会议")
-            if session == root or session.parent != root:
-                raise RuntimeError("只能删除输出目录内的单个会议文件夹")
-            if not minutes.is_file() or not session.is_dir():
-                raise RuntimeError("会议记录不存在或已被移除")
+            session = self._session_from_minutes(path)
 
             shutil.rmtree(session)
             with _state.lock:
