@@ -13,6 +13,8 @@ if not exist .venv\Scripts\python.exe (
   --add-data "src\meetingkit\webui\index.html;meetingkit\webui" ^
   --add-data "src\meetingkit\webui\styles.css;meetingkit\webui" ^
   --add-data "src\meetingkit\webui\app.js;meetingkit\webui" ^
+  --add-data "src\meetingkit\webui\workspace.js;meetingkit\webui" ^
+  --add-data "src\meetingkit\webui\workspace.css;meetingkit\webui" ^
   --hidden-import meetingkit.audio.windows_rec ^
   --hidden-import pyaudiowpatch ^
   --hidden-import truststore._windows ^

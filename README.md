@@ -2,7 +2,7 @@
 
 > 会议纪要助手：同步录制会议内声与麦克风，或导入已有音视频，自动完成说话人分离、全文转写和结构化会议纪要。
 
-[![Version](https://img.shields.io/badge/version-0.1.10-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.2.0-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-18213d.svg)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0aa6b5.svg)
 
@@ -35,20 +35,19 @@
 - 会议音频、转写稿和纪要按会议分文件夹保存，支持断点续跑与历史管理。
 - 在纪要编辑页按需清理音频：可仅删除当前会议原始双轨并保留混合音频，也可删除当前或全部历史会议的所有程序音频；文字资料始终保留。
 
+## 会议工作区
+
+工作台提供最近会议、待校对筛选、名称搜索和继续上次工作。纪要编辑使用会议列表、正文和辅助侧栏三栏布局；专注模式可收起辅助信息，按 Esc 返回。
+
+校对任务显示上下文与出现次数，可确认无误或全文替换。准确名称可加入个人术语库，供后续会议生成参考。全部术语确认后才能导出。
+
+在侧栏试听说话人的发言并匹配姓名；原文支持按时间戳分段试听。试听使用本机保存的会议音频，不额外上传。音频被清理后仍可查看文字，旧会议没有时间戳时显示完整转写。播放格式支持取决于系统浏览器内核。
+
+偏好设置支持 14、15、17 号正文阅读字号及减少动态效果，设置和术语库保存在本机。
+
 ## 一致的会议工作流
 
 录制与导入使用相同的双栏网格和处理状态，切换页面时操作区不会横向跳动。
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/images/record.png" alt="会议录制页"></td>
-    <td width="50%"><img src="docs/images/import.png" alt="导入生成页"></td>
-  </tr>
-  <tr>
-    <td align="center"><strong>会议录制</strong></td>
-    <td align="center"><strong>导入生成</strong></td>
-  </tr>
-</table>
 
 无论选择哪种入口，处理都依次经过：
 
@@ -63,14 +62,14 @@
   <img src="docs/images/minutes.png" alt="会议纪要编辑器" width="100%">
 </p>
 
-编辑器会将可视内容序列化回 Markdown；导出文件可被常见 Markdown 阅读器正确渲染。点击“匹配参会人”可根据样例发言确认每个说话人的姓名，匹配结果按会议保存。历史列表支持搜索、滚动和删除整个会议文件夹；删除前会明确确认影响范围。
+编辑器会将可视内容序列化回 Markdown；导出文件可被常见 Markdown 阅读器正确渲染。在右侧“参会人”栏试听样例发言并确认每个说话人的姓名，匹配结果按会议保存。历史列表支持搜索、滚动和删除整个会议文件夹；删除前会明确确认影响范围。
 
-点击“清理音频”可查看当前会议与全部历史会议占用的音频空间。推荐在确认转写和纪要无误后删除 `track_system.wav` 与 `track_mic.wav`，仅保留混合后的 `audio.wav`；也可以只删除某场会议或全部历史会议的所有程序音频。音频清理不会删除纪要、完整转写、JSON 或会议文件夹。
+点击“更多 → 清理音频”可查看当前会议与全部历史会议占用的音频空间。推荐在确认转写和纪要无误后删除 `track_system.wav` 与 `track_mic.wav`，仅保留混合后的 `audio.wav`；也可以只删除某场会议或全部历史会议的所有程序音频。音频清理不会删除纪要、完整转写、JSON 或会议文件夹。
 
 ## 首次使用
 
 1. 在阿里云百炼中创建 API Key。
-2. 打开应用右上角“设置”，填入 API Key；使用专属网关时再填写 API 网关地址。
+2. 打开应用右上角“偏好设置 → 连接设置”，填入 API Key；使用专属网关时再填写 API 网关地址。
 3. 选择“会议录制”或“导入生成”。
 4. 处理完成后在“纪要编辑”中检查说话人、决策和行动事项。
 
