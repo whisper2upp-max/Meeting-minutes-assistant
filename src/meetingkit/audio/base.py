@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 import wave
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,8 @@ class WavTrackWriter:
         self.sample_rate = sample_rate
         self.channels = max(1, int(channels))
         self._frames = 0
+        self.level = 0.0
+        self.level_updated = 0.0
         self._lock = threading.Lock()
         self._closed = False
         self._fh = wave.open(str(path), "wb")
@@ -43,6 +46,9 @@ class WavTrackWriter:
                 return
             pcm = (x[:usable].reshape(-1, self.channels).astype(np.int32)
                    .mean(axis=1).astype(np.int16).tobytes())
+        samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+        self.level = min(1.0, float(np.sqrt(np.mean(samples * samples))) / 6000.0) if samples.size else 0.0
+        self.level_updated = time.monotonic()
         with self._lock:
             self._fh.writeframes(pcm)
             self._frames += len(pcm) // 2

@@ -998,7 +998,9 @@ async function saveSpeakerMapping() {
 async function openMinutes(path) {
   if (!path || !state.apiReady) return;
   if (state.dirty && path !== state.activeMinutes && !window.confirm("当前纪要尚未保存，确定切换吗？")) return;
+  const request = state.minutesRequest = (state.minutesRequest || 0) + 1;
   const result = await api().get_minutes(path);
+  if (request !== state.minutesRequest) return;
   if (!result.ok) return toast(result.error);
   state.activeMinutes = path;
   state.transcriptPath = result.transcript || "";

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>会议纪要助手</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="workspace.css">
 </head>
 <body>
   <header class="app-header">
@@ -29,7 +30,7 @@
       <button class="status-chip" id="statusChip" type="button">
         <span class="status-dot"></span><span id="statusText">本机就绪</span>
       </button>
-      <span class="version-chip" id="versionChip">v0.1.10</span>
+      <span class="version-chip" id="versionChip">v0.2.0</span>
       <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
         <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
       </button>
@@ -114,7 +115,7 @@
         <button class="shortcut-card release" id="btnChangelog" type="button">
           <span class="shortcut-index">04</span>
           <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
-          <strong>更新日志</strong><small>v0.1.10 · 智能校对与术语确认</small><i>查看变化 →</i>
+          <strong>更新日志</strong><small>v0.2.0 · 会议工作区</small><i>查看变化 →</i>
         </button>
       </div>
 
@@ -365,9 +366,12 @@
 
   <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
     <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.10</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
-      <div class="release-hero"><span>0.1.10</span><div><strong>智能校对与术语确认</strong><small>2026-11-09 · Proofreading</small></div></div>
+      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.2.0</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
+      <div class="release-hero"><span>0.2.0</span><div><strong>会议工作区与智能校对</strong><small>2026-11-09</small></div></div>
       <div class="release-list">
+        <article><span>NEW</span><div><h3>接续上次工作的首页</h3><p>最近会议支持待校对筛选与名称搜索，继续编辑入口保留上次打开的会议。</p></div></article>
+        <article><span>NEW</span><div><h3>侧栏试听与参会人匹配</h3><p>按转写时间戳试听真实录音，在侧栏确认姓名并自动保存；原文支持分段查看和播放。</p></div></article>
+        <article><span>NEW</span><div><h3>个人术语库与阅读偏好</h3><p>保存准确名称供后续生成参考，调整正文阅读字号、减少动态效果。专注模式可按 Esc 返回。</p></div></article>
         <article><span>NEW</span><div><h3>生成后自动校对</h3><p>校对常见错别字和语病，不确定的术语与英文缩写交由人工确认。</p></div></article>
         <article><span>NEW</span><div><h3>术语确认任务</h3><p>支持确认无误、全文替换和原地撤销，处理状态随纪要保存；完成全部任务后即可导出。</p></div></article>
         <article><span>IMPROVED</span><div><h3>更宽敞的正文编辑区</h3><p>会议目录与顶部工具区更加紧凑，校对任务采用独立滚动卡片。</p></div></article>
@@ -452,5 +456,6 @@
 
   <div class="toast hidden" id="toast" role="status"></div>
   <script src="app.js"></script>
+  <script src="workspace.js"></script>
 </body>
 </html>

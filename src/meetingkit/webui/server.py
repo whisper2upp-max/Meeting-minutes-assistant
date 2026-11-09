@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -90,6 +91,7 @@ class UiState:
             error, result = self.error, self.result
             devices = dict(self.devices)
             session = self.session_dir
+            recorder = self.recorder
             mic_monitor = self.mic_monitor
             mic_capture_enabled = self.mic_capture_enabled
         mic_test_active = bool(mic_monitor and mic_monitor.active)
@@ -115,6 +117,12 @@ class UiState:
             "mic_test_output": mic_monitor.output_name if mic_monitor else "",
             "mic_test_level": float(getattr(mic_monitor, "level", 0.0)) if mic_monitor else 0.0,
             "mic_capture_enabled": mic_capture_enabled,
+            "recording_levels": {
+                spec.label: float(getattr(writer, "level", 0.0))
+                for spec, writer in zip(getattr(recorder, "_specs", []),
+                                        getattr(recorder, "_writers", []))
+                if phase == "recording" and time.monotonic() - getattr(writer, "level_updated", 0.0) < 1.5
+            },
             "loopback_ready": loopback_ready,
             "version": __version__,
             "config": {
@@ -651,7 +659,7 @@ class Api:
                 "proofreading": review,
                 "content": p.read_text(encoding="utf-8"),
                 "session": str(p.parent),
-                "session_name": p.parent.name,
+                "session_name": metadata.get("title") or p.parent.name,
                 "transcript": str(transcript) if transcript.exists() else "",
                 "mtime": datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M"),
                 "detail_level": detail["value"],
@@ -929,6 +937,69 @@ class Api:
             _state.set(phase="error", stage="minutes", error=detail)
             _state.log(f"错误：{detail}")
 
+    def get_workspace(self) -> dict:
+        from ..workspace import read_workspace
+        try:
+            return {"ok": True, **read_workspace()}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def save_workspace(self, changes: dict) -> dict:
+        from ..workspace import update_workspace
+        try:
+            if not isinstance(changes, dict):
+                raise ValueError("设置格式无效")
+            if changes.get("last_minutes"):
+                self._safe_minutes_path(changes["last_minutes"])
+            return {"ok": True, **update_workspace(changes)}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def get_meeting_segments(self, path: str) -> dict:
+        from .media import register
+        try:
+            minutes = self._safe_minutes_path(path)
+            session = minutes.parent
+            transcript = session / pipeline_mod.TRANSCRIPT_JSON
+            if transcript.is_symlink():
+                raise ValueError("不支持符号链接转写文件")
+            sentences = []
+            if transcript.exists():
+                payload = json.loads(transcript.read_text(encoding="utf-8"))
+                sentences = payload.get("sentences", [])
+            _, mapping, _ = self._speaker_context(minutes)
+            segments = []
+            for item in sentences:
+                try:
+                    number = int(item.get("speaker_id", -1)) + 1
+                    begin = max(0, int(item.get("begin_ms", 0))) / 1000
+                    end = max(0, int(item.get("end_ms", 0))) / 1000
+                    text = str(item.get("text", "")).strip()
+                    if text:
+                        segments.append({"number": number, "speaker": mapping.get(str(number), f"说话人{number}" if number else "发言人"),
+                                         "begin": begin, "end": end, "text": text})
+                except (TypeError, ValueError):
+                    continue
+            audio = session / pipeline_mod.AUDIO_WAV
+            audio_url = register(audio) if audio.is_file() and not audio.is_symlink() else ""
+            fallback = session / pipeline_mod.TRANSCRIPT_MD
+            content = fallback.read_text(encoding="utf-8") if not segments and fallback.is_file() and not fallback.is_symlink() else ""
+            return {"ok": True, "segments": segments, "audio_url": audio_url, "content": content,
+                    "audio_message": "" if audio_url else "录音已清理或不存在，仍可查看转写文字"}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def get_transcript(self, path: str) -> dict:
+        """Read the transcript belonging to an authorized minutes file."""
+        try:
+            minutes = self._safe_minutes_path(path)
+            transcript = minutes.parent / pipeline_mod.TRANSCRIPT_MD
+            if transcript.is_symlink():
+                raise ValueError("不支持符号链接转写文件")
+            return {"ok": True, "content": transcript.read_text(encoding="utf-8")}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
     def save_minutes(self, path: str, content: str, decisions: dict = None) -> dict:
         try:
             p = self._safe_minutes_path(path)
@@ -938,6 +1009,10 @@ class Api:
                 review = json.loads(review_path.read_text(encoding="utf-8"))
                 for item in review.get("uncertain", []):
                     choice = decisions.get(item["term"], "pending")
+                    if isinstance(choice, dict):
+                        replacement = str(choice.get("replacement", ""))[:500]
+                        choice = choice.get("decision", "pending")
+                        item["replacement"] = replacement if choice == "replaced" else ""
                     item["decision"] = choice if choice in ("confirmed", "replaced") else "pending"
                 review_path.write_text(json.dumps(review, ensure_ascii=False), encoding="utf-8")
             _state.log(f"纪要已保存：{p.name}")
@@ -1011,7 +1086,26 @@ class Api:
                 transcript = d / pipeline_mod.TRANSCRIPT_MD
                 metadata = pipeline_mod.load_session_metadata(d)
                 detail = detail_level_info(metadata["detail_level"])
-                out.append({"name": d.name,
+                review = {}
+                try:
+                    review = json.loads((d / "proofreading.json").read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    pass
+                pending = sum(1 for item in review.get("uncertain", [])
+                              if item.get("term") and item.get("decision") not in ("confirmed", "replaced"))
+                duration = float(metadata.get("duration_seconds", 0) or 0)
+                if not duration:
+                    try:
+                        sentences = json.loads((d / pipeline_mod.TRANSCRIPT_JSON).read_text(encoding="utf-8")).get("sentences", [])
+                        duration = max((int(x.get("end_ms", 0) or 0) for x in sentences), default=0) / 1000
+                    except (OSError, ValueError, TypeError):
+                        pass
+                out.append({"duration_seconds": duration, "title": metadata.get("title") or d.name,
+                            "attendees": metadata["attendees"],
+                            "started_at": metadata.get("started_at", ""),
+                            "total_terms": len(review.get("uncertain", [])),
+                            "pending_terms": pending,
+                            "review_status": review.get("status", "unknown"), "name": d.name,
                             "minutes": str(m),
                             "transcript": str(transcript) if transcript.exists() else "",
                             "detail_level": detail["value"],
