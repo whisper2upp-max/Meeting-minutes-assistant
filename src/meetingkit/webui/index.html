@@ -29,7 +29,7 @@
       <button class="status-chip" id="statusChip" type="button">
         <span class="status-dot"></span><span id="statusText">本机就绪</span>
       </button>
-      <span class="version-chip" id="versionChip">v0.1.9</span>
+      <span class="version-chip" id="versionChip">v0.1.10</span>
       <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
         <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
       </button>
@@ -114,7 +114,7 @@
         <button class="shortcut-card release" id="btnChangelog" type="button">
           <span class="shortcut-index">04</span>
           <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
-          <strong>更新日志</strong><small>v0.1.9 · 按需清理会议音频</small><i>查看变化 →</i>
+          <strong>更新日志</strong><small>v0.1.10 · 智能校对与术语确认</small><i>查看变化 →</i>
         </button>
       </div>
 
@@ -296,9 +296,12 @@
             <button data-command="redo" type="button" disabled title="重做">↷</button>
             <button data-command="removeFormat" type="button" disabled title="清除格式">Tx</button>
           </div>
+          <div class="proofreading-layout">
           <article class="minutes-editor empty" id="minutesBody" contenteditable="false">
             <div class="editor-empty"><span><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/></svg></span><strong>选择左侧会议纪要</strong><small>这里可以直接编辑标题、段落、列表和行动项表格。</small></div>
           </article>
+          <aside id="proofreadingPanel" class="proofreading-panel" aria-label="术语校对">选择纪要后显示校对结果</aside>
+          </div>
           <footer class="editor-footer"><span>自动将可视编辑内容转换为 Markdown 保存</span><span><kbd>⌘</kbd> + <kbd>S</kbd> 保存</span></footer>
         </section>
       </div>
@@ -362,9 +365,12 @@
 
   <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
     <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.9</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
-      <div class="release-hero"><span>0.1.9</span><div><strong>按需清理会议音频</strong><small>2026-09-05 · Storage management</small></div></div>
+      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.1.10</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
+      <div class="release-hero"><span>0.1.10</span><div><strong>智能校对与术语确认</strong><small>2026-11-09 · Proofreading</small></div></div>
       <div class="release-list">
+        <article><span>NEW</span><div><h3>生成后自动校对</h3><p>校对常见错别字和语病，不确定的术语与英文缩写交由人工确认。</p></div></article>
+        <article><span>NEW</span><div><h3>术语确认任务</h3><p>支持确认无误、全文替换和原地撤销，处理状态随纪要保存；完成全部任务后即可导出。</p></div></article>
+        <article><span>IMPROVED</span><div><h3>更宽敞的正文编辑区</h3><p>会议目录与顶部工具区更加紧凑，校对任务采用独立滚动卡片。</p></div></article>
         <article><span>NEW</span><div><h3>三种音频清理范围</h3><p>可仅删除当前会议原始双轨并保留混合音频，也可删除当前会议或全部历史会议的所有程序音频。</p></div></article>
         <article><span>SAFE</span><div><h3>文字资料始终保留</h3><p>清理只识别程序生成的三个固定音频文件，不会删除纪要、完整转写、JSON、会议文件夹或用户自行添加的文件。</p></div></article>
         <article><span>IMPROVED</span><div><h3>清理前统计空间</h3><p>选择范围前显示涉及场次、文件数量和预计释放空间；录音或处理进行中自动禁止清理。</p></div></article>

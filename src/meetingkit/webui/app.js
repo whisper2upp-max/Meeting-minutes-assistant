@@ -1008,15 +1008,116 @@ async function openMinutes(path) {
   state.dirty = false;
   $("minutesBody").classList.remove("empty");
   $("minutesBody").innerHTML = markdownToHtml(result.content);
+  renderProofreading(result.proofreading);
   $("documentTitle").value = result.session_name || sessionTitle({ name: basename(result.session) });
   $("minutesPath").textContent = path;
   $("documentTime").textContent = result.mtime || "本机文件";
   updateWordCount();
   markSaved();
   setEditorEnabled(true);
+  renderProofreading(state.proofreading);
   renderMinutesGeneration(state.status || {});
   renderSessionList();
   setActiveView("minutes", true);
+}
+
+function renderProofreading(review) {
+  state.proofreading = review || {uncertain: []};
+  const panel = $("proofreadingPanel");
+  panel.replaceChildren();
+  const title = document.createElement("h3");
+  title.textContent = "术语待确认";
+  const header = document.createElement("div");
+  header.className = "proofreading-head";
+  panel.append(header);
+  const note = document.createElement("p");
+  note.textContent = review?.status === "done" ? "常见语病已校对。请确认以下词语；替换后可撤销，保存后生效。" : review?.status === "failed" ? "自动校对未完成，请人工检查或重新生成。" : "此纪要尚无校对结果，重新生成后可自动校对。";
+  header.append(title, note);
+  const items = (review?.uncertain || []).filter(item => item.term);
+  const progress = document.createElement("p");
+  header.append(progress);
+  const updateProgress = () => {
+    const done = items.filter(item => ["confirmed", "replaced"].includes(item.decision)).length;
+    progress.textContent = `已完成 ${done} / ${items.length} · 待处理 ${items.length - done}`;
+    $("btnExport").disabled = done !== items.length || !state.activeMinutes;
+    $("btnExport").title = done !== items.length ? "请先完成右侧所有校对任务" : "导出纪要";
+  };
+  updateProgress();
+  if (review?.status === "done" && !items.length) note.textContent = "校对完成，没有待确认术语。仍建议核对关键事实。";
+  for (const item of items) {
+    const card = document.createElement("div");
+    card.className = "proofreading-card";
+    const label = document.createElement("strong");
+    label.textContent = item.term;
+    const reason = document.createElement("p");
+    reason.textContent = item.reason;
+    const input = document.createElement("input");
+    input.placeholder = "输入准确名称";
+    input.setAttribute("aria-label", `${item.term}的准确名称`);
+    const button = document.createElement("button");
+    button.textContent = "全文替换";
+    const confirm = document.createElement("button");
+    confirm.textContent = "确认无误";
+    const actions = document.createElement("div");
+    actions.className = "proofreading-actions";
+    const status = document.createElement("span");
+    status.className = "proofreading-status";
+    const reopen = document.createElement("button");
+    reopen.textContent = "重新确认";
+    const sync = () => {
+      const done = ["confirmed", "replaced"].includes(item.decision);
+      card.classList.toggle("resolved", done);
+      input.disabled = done;
+      button.hidden = confirm.hidden = done;
+      reopen.hidden = !done;
+      status.textContent = item.decision === "confirmed" ? "✓ 已确认无误" : item.decision === "replaced" ? "✓ 已替换" : "待处理";
+      updateProgress();
+    };
+    confirm.onclick = () => { item.decision = "confirmed"; markDirty(); sync(); };
+    reopen.onclick = () => { item.decision = "pending"; markDirty(); sync(); };
+    actions.append(status, confirm, button, reopen);
+    sync();
+    button.onclick = () => {
+      const replacement = input.value.trim();
+      if (!replacement || replacement === item.term) return toast("请输入不同的准确名称");
+      const nodes = [];
+      const walker = document.createTreeWalker($("minutesBody"), NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) if (walker.currentNode.data.includes(item.term)) nodes.push(walker.currentNode);
+      const count = nodes.reduce((n, node) => n + node.data.split(item.term).length - 1, 0);
+      if (!count) return toast("当前正文已没有这个词");
+      if (!window.confirm(`将当前纪要中 ${count} 处“${item.term}”替换为“${replacement}”？`)) return;
+      const originals = nodes.map(node => node.data);
+      for (const node of nodes) node.data = node.data.split(item.term).join(replacement);
+      const undo = document.createElement("button");
+      undo.textContent = "撤销这次替换";
+      const changed = nodes.map(node => ({ node, after: node.data }));
+      item.decision = "replaced";
+      sync();
+      markDirty();
+      updateWordCount();
+      card.classList.add("resolved");
+      input.disabled = true;
+      button.hidden = true;
+      status.textContent = `已替换 ${count} 处`;
+      actions.append(undo);
+      undo.onclick = () => {
+        if (changed.some(({node, after}) => !$("minutesBody").contains(node) || node.data !== after)) return toast("正文已继续编辑，请使用编辑器撤销或手动修正");
+        nodes.forEach((node, i) => { node.data = originals[i]; });
+        markDirty();
+        updateWordCount();
+        undo.remove();
+        item.decision = "pending";
+        sync();
+        card.classList.remove("resolved");
+        input.disabled = false;
+        button.hidden = false;
+        status.textContent = "已撤销";
+      };
+      toast(`已替换 ${count} 处，请保存纪要`);
+    };
+    card.append(label, reason, input, actions);
+    panel.append(card);
+  }
 }
 
 async function regenerateMinutes() {
@@ -1042,12 +1143,14 @@ async function regenerateMinutes() {
 async function saveMinutes() {
   if (!state.activeMinutes || !state.apiReady) return false;
   const markdown = editorToMarkdown($("minutesBody"));
-  const result = await api().save_minutes(state.activeMinutes, markdown);
+  const decisions = Object.fromEntries((state.proofreading?.uncertain || []).map(item => [item.term, item.decision || "pending"]));
+  const result = await api().save_minutes(state.activeMinutes, markdown, decisions);
   if (!result.ok) {
     toast(result.error);
     return false;
   }
   $("minutesBody").innerHTML = markdownToHtml(markdown);
+  renderProofreading(state.proofreading);
   markSaved();
   toast("纪要已保存");
   await loadSessions();
@@ -1056,9 +1159,10 @@ async function saveMinutes() {
 
 async function exportMinutes() {
   if (!state.activeMinutes || !state.apiReady) return;
+  if ((state.proofreading?.uncertain || []).some(item => !["confirmed", "replaced"].includes(item.decision))) return toast("请先完成右侧所有校对任务");
   if (state.dirty) {
     if (!window.confirm("纪要有未保存修改。先保存再导出吗？")) return;
-    await saveMinutes();
+    if (!await saveMinutes()) return;
   }
   const result = await api().export_minutes(state.activeMinutes);
   if (result.ok) toast(`已导出：${result.dest}`);

@@ -443,13 +443,16 @@ svg { width: 1.2em; height: 1.2em; fill: none; stroke: currentColor; stroke-widt
 body.minutes-mode { overflow: hidden; }
 .minutes-mode .app-shell { height: calc(100vh - 72px); height: calc(100dvh - 72px); padding-top: 18px; padding-bottom: 18px; }
 .minutes-mode .minutes-view.active { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.editor-topline { min-height: 70px; margin-bottom: 16px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
-.editor-topline h1 { font-size: 28px; }
+.editor-topline { min-height: 38px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.editor-topline h1 { font-size: 20px; margin: 0; }
+.editor-topline .eyebrow { display: none; }
 .editor-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
 .save-state { margin-right: 5px; display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 9.5px; font-weight: 700; }
 .save-state i { width: 6px; height: 6px; border-radius: 50%; background: #aeb7ca; }.save-state.dirty { color: #b47616; }.save-state.dirty i { background: #eaa638; }.save-state.saved { color: var(--emerald); }.save-state.saved i { background: var(--emerald); }
 .editor-shell { height: calc(100vh - 190px); height: calc(100dvh - 190px); min-height: 0; display: grid; grid-template-columns: 270px minmax(0,1fr); overflow: hidden; background: #fff; border: 1px solid var(--line-dark); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
 .minutes-mode .editor-shell { height: auto; min-height: 0; flex: 1; }
+@media (min-width: 901px) { .minutes-mode .editor-shell { grid-template-columns: 200px minmax(0, 1fr); } }
+.minutes-mode .editor-toolbar { min-height: 37px; padding: 3px 12px; }
 .session-sidebar { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: #f8f9fc; border-right: 1px solid var(--line); }
 .sidebar-head { min-height: 73px; padding: 16px 16px 12px 19px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .sidebar-head > div { display: flex; flex-direction: column; }.sidebar-head strong { font-size: 12px; }.sidebar-head small { color: var(--muted); font-size: 8.5px; }
@@ -464,12 +467,13 @@ body.minutes-mode { overflow: hidden; }
 .session-delete:hover { color: #b93240; background: var(--coral-soft); }
 .session-delete svg { width: 13px; height: 13px; }
 .editor-workspace { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
-.document-head { min-height: 102px; padding: 19px 28px 14px; display: flex; align-items: end; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.document-head { min-height: 64px; padding: 9px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.document-head .document-kicker { display: none; }
 .document-head > div:first-child { min-width: 0; flex: 1; }.document-kicker { color: var(--indigo); font: 800 8px/1 var(--mono); letter-spacing: .12em; }
 .document-head input { height: auto; margin-top: 6px; padding: 0; font-size: 22px; font-weight: 750; letter-spacing: -.025em; border: 0; border-radius: 0; }.document-head input:not([readonly]) { padding-bottom: 3px; border-bottom: 1px solid var(--line-dark); }
 .document-head p { max-width: 750px; overflow: hidden; margin: 3px 0 0; color: var(--muted); font: 8px/1.3 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
 .document-meta { flex: none; display: flex; gap: 10px; color: var(--muted); font: 8px/1 var(--mono); }.document-meta span { padding: 6px 8px; background: #f5f7fb; border-radius: 6px; }
-.generation-bar { min-height: 53px; padding: 8px 18px; display: grid; grid-template-columns: minmax(170px, 1fr) auto auto; gap: 12px; align-items: center; background: #fff; border-bottom: 1px solid var(--line); }
+.generation-bar { min-height: 43px; padding: 4px 14px; display: grid; grid-template-columns: minmax(120px, 1fr) auto auto; gap: 8px; align-items: center; background: #fff; border-bottom: 1px solid var(--line); }
 .generation-copy { min-width: 0; display: flex; flex-direction: column; }
 .generation-copy strong { color: var(--ink-2); font-size: 10px; }
 .generation-copy small { overflow: hidden; margin-top: 2px; color: var(--muted); font-size: 8.5px; text-overflow: ellipsis; white-space: nowrap; }
@@ -594,3 +598,24 @@ body.minutes-mode { overflow: hidden; }
   .speaker-assignment { grid-column: auto; }
   .progress-steps { grid-template-columns: repeat(2,1fr); }.progress-steps > div:nth-child(3) { border-left: 0; border-top: 1px solid var(--line); }.progress-steps > div:nth-child(4) { border-top: 1px solid var(--line); }
 }
+.proofreading-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.proofreading-layout .minutes-editor { flex: 1; min-width: 0; overflow-y: auto; }
+.proofreading-panel { width: 224px; flex-shrink: 0; padding: 0 12px 12px; overflow-y: auto; border-left: 1px solid var(--line); background: #f8f9fd; font-size: 10px; }
+.proofreading-head { position: sticky; top: 0; z-index: 1; padding: 15px 2px 12px; background: #f8f9fd; }
+.proofreading-panel h3 { margin: 0 0 5px; color: var(--ink-2); font-size: 11px; font-weight: 750; }
+.proofreading-panel p { margin: 5px 0 10px; color: var(--soft); font-size: 9px; line-height: 1.65; }
+.proofreading-head p { margin-bottom: 0; color: var(--muted); }
+.proofreading-card { margin-bottom: 9px; padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.proofreading-card > strong { display: block; color: var(--ink-2); font-size: 10.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.proofreading-card.resolved { border-color: #cce9df; }
+.proofreading-panel input { width: 100%; height: 32px; padding: 0 9px; outline: 0; font: inherit; font-size: 10px; color: var(--ink); border: 1px solid var(--line-dark); border-radius: 8px; background: var(--paper); }
+.proofreading-panel input:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(102,92,255,.1); }
+.proofreading-panel input:disabled { color: var(--emerald); background: var(--emerald-soft); }
+.proofreading-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 5px; margin-top: 8px; }
+.proofreading-actions .proofreading-status { width: 100%; }
+.proofreading-status { color: #b47616; font-size: 8px; }
+.proofreading-card.resolved .proofreading-status { color: var(--emerald); }
+.proofreading-panel button { min-height: 28px; padding: 0 9px; font-family: inherit; font-size: 9px; font-weight: 750; border: 1px solid #d7d2ff; border-radius: 7px; color: var(--indigo); background: var(--indigo-soft); white-space: nowrap; }
+.proofreading-panel button:hover { border-color: var(--indigo); }
+.proofreading-panel button[hidden] { display: none; }
+@media (max-width: 900px) { .proofreading-layout { flex-direction: column; overflow-y: auto; } .proofreading-panel { width: auto; max-height: 220px; flex-shrink: 0; border-left: 0; border-top: 1px solid var(--line); } }

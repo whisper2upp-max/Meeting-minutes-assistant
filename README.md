@@ -2,7 +2,7 @@
 
 > 会议纪要助手：同步录制会议内声与麦克风，或导入已有音视频，自动完成说话人分离、全文转写和结构化会议纪要。
 
-[![Version](https://img.shields.io/badge/version-0.1.9-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.1.10-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-18213d.svg)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0aa6b5.svg)
 

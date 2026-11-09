@@ -205,6 +205,8 @@ def run_pipeline(
             progress=progress,
         )
         minutes_path.write_text(minutes, encoding="utf-8")
+        (session_dir / "proofreading.json").write_text(
+            json.dumps(getattr(minutes, "review", {"status": "unavailable", "uncertain": []}), ensure_ascii=False), encoding="utf-8")
     elif progress:
         progress("minutes", "发现已有纪要，跳过生成。")
 
