@@ -641,8 +641,14 @@ class Api:
             detail = detail_level_info(metadata["detail_level"])
             history_dir = p.parent / pipeline_mod.MINUTES_HISTORY_DIR
             history_count = len(list(history_dir.glob("*.md"))) if history_dir.exists() else 0
+            review = {"status": "unavailable", "uncertain": []}
+            try:
+                review = json.loads((p.parent / "proofreading.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                pass
             return {
                 "ok": True,
+                "proofreading": review,
                 "content": p.read_text(encoding="utf-8"),
                 "session": str(p.parent),
                 "session_name": p.parent.name,
@@ -897,6 +903,8 @@ class Api:
             temporary = minutes.parent / ".会议纪要.md.tmp"
             temporary.write_text(generated, encoding="utf-8")
             temporary.replace(minutes)
+            (minutes.parent / "proofreading.json").write_text(
+                json.dumps(getattr(generated, "review", {"status": "unavailable", "uncertain": []}), ensure_ascii=False), encoding="utf-8")
             model = llm_mod.resolve_minutes_model(cfg.llm_model, detail_level)
             pipeline_mod.save_session_metadata(
                 minutes.parent,
@@ -921,10 +929,17 @@ class Api:
             _state.set(phase="error", stage="minutes", error=detail)
             _state.log(f"错误：{detail}")
 
-    def save_minutes(self, path: str, content: str) -> dict:
+    def save_minutes(self, path: str, content: str, decisions: dict = None) -> dict:
         try:
             p = self._safe_minutes_path(path)
             p.write_text(content, encoding="utf-8")
+            review_path = p.parent / "proofreading.json"
+            if decisions is not None and review_path.exists():
+                review = json.loads(review_path.read_text(encoding="utf-8"))
+                for item in review.get("uncertain", []):
+                    choice = decisions.get(item["term"], "pending")
+                    item["decision"] = choice if choice in ("confirmed", "replaced") else "pending"
+                review_path.write_text(json.dumps(review, ensure_ascii=False), encoding="utf-8")
             _state.log(f"纪要已保存：{p.name}")
             return {"ok": True}
         except Exception as exc:
@@ -934,6 +949,13 @@ class Api:
         """导出纪要到用户选择的目录（同名冲突时自动加时间后缀）。"""
         try:
             src = self._safe_minutes_path(path)
+            review_path = src.parent / "proofreading.json"
+            if review_path.exists():
+                review = json.loads(review_path.read_text(encoding="utf-8"))
+                pending = [item for item in review.get("uncertain", [])
+                           if item.get("decision") not in ("confirmed", "replaced")]
+                if pending:
+                    return {"ok": False, "error": f"还有 {len(pending)} 项术语待确认，请完成校对并保存后再导出。"}
             dest_dir = self.pick_folder()
             if not dest_dir:
                 return {"ok": False, "error": "未选择导出目录"}
