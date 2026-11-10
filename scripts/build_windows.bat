@@ -24,5 +24,13 @@ if not exist .venv\Scripts\python.exe (
   --icon assets\app.ico ^
   run_app.py
 
+if errorlevel 1 exit /b 1
+if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
+  "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" scripts\windows_installer.iss
+  if errorlevel 1 exit /b 1
+) else (
+  echo 安装 Inno Setup 6 后可生成 Setup 安装包。
+)
+
 echo 打包完成：dist\会议纪要助手.exe
 echo 分发提示：未签名，用户首次运行 SmartScreen 选“更多信息-仍要运行”；详见 docs\使用说明-Windows.md
