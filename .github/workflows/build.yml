@@ -41,6 +41,29 @@ jobs:
           --version-file assets\version_info.txt
           --icon assets\app.ico
           run_app.py
+      - name: 生成 Windows 安装包
+        shell: pwsh
+        run: |
+          $version = python -c "import sys; sys.path.insert(0, 'src'); from meetingkit import __version__; print(__version__)"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" scripts/windows_installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed" }
+      - name: 验证安装、升级和卸载
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist/*-Setup.exe).FullName
+          $target = Join-Path $env:RUNNER_TEMP "MeetingInstallerTest"
+          foreach ($attempt in 1..2) {
+            $process = Start-Process $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target" -Wait -PassThru
+            if ($process.ExitCode -ne 0 -or !(Test-Path "$target/会议纪要助手.exe")) { throw "Install/upgrade failed" }
+          }
+          $process = Start-Process "$target/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
+          if ($process.ExitCode -ne 0 -or (Test-Path "$target/会议纪要助手.exe")) { throw "Uninstall failed" }
+      - name: 上传安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: meetingkit-windows-installer
+          path: dist/*-Setup.exe
+          if-no-files-found: error
       - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
