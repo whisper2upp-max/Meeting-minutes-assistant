@@ -4,7 +4,7 @@ import os
 
 from .tls import enable_windows_system_trust
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 
 def _bypass_proxy_for_aliyun() -> None:

@@ -1436,6 +1436,16 @@ async function saveSettings() {
   await loadSessions();
 }
 
+async function openOutputFolder() {
+  if (!state.apiReady) return;
+  try {
+    const result = await api().open_output_dir();
+    if (!result.ok) toast(result.error || "无法打开输出目录");
+  } catch (error) {
+    toast("无法打开输出目录：" + (error.message || String(error)));
+  }
+}
+
 function bindEvents() {
   qa("[data-view]").forEach((control) => control.addEventListener("click", (event) => {
     event.preventDefault();
@@ -1475,11 +1485,7 @@ function bindEvents() {
   $("btnGuide").addEventListener("click", () => openOverlay("guideOverlay"));
   $("btnChangelog").addEventListener("click", () => openOverlay("changelogOverlay"));
   $("btnSettings").addEventListener("click", openSettings);
-  $("btnOutput").addEventListener("click", async () => {
-    if (!state.apiReady) return;
-    const result = await api().open_output_dir();
-    if (!result.ok) toast(result.error || "无法打开输出目录");
-  });
+  $("btnOutput").addEventListener("click", openOutputFolder);
   $("btnAllMinutes").addEventListener("click", () => setActiveView("minutes"));
   $("btnRefresh").addEventListener("click", async () => {
     await stopMicTest(true);
@@ -1545,7 +1551,7 @@ function bindEvents() {
   });
   $("btnConfirmAudioCleanup").addEventListener("click", confirmAudioCleanup);
   $("btnExport").addEventListener("click", exportMinutes);
-  $("btnOpenFolder").addEventListener("click", () => state.activeMinutes && api().reveal(state.activeMinutes));
+  $("btnOpenFolder").addEventListener("click", openOutputFolder);
   $("btnTranscript").addEventListener("click", () => state.transcriptPath && api().open_file(state.transcriptPath));
   $("btnConfirmDelete").addEventListener("click", confirmDeleteSession);
 
