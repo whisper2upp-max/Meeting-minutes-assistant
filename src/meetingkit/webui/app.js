@@ -823,7 +823,7 @@ function changeTable(action) {
 
 function setEditorEnabled(enabled) {
   $("minutesBody").contentEditable = enabled ? "true" : "false";
-  $("documentTitle").readOnly = true;
+  $("documentTitle").readOnly = !enabled;
   qa("button, select", $("editorToolbar")).forEach((control) => { control.disabled = !enabled; });
   $("btnSaveMinutes").disabled = !enabled || !state.dirty;
   ["btnExport", "btnOpenFolder"].forEach((id) => { $(id).disabled = !enabled; });
