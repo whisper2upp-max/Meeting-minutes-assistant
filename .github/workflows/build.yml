@@ -28,6 +28,7 @@ jobs:
           pyinstaller --noconfirm --clean --windowed --onefile
           --name "会议纪要助手"
           --paths src
+          --collect-all dashscope
           --add-data "src\meetingkit\webui\index.html;meetingkit\webui"
           --add-data "src\meetingkit\webui\styles.css;meetingkit\webui"
           --add-data "src\meetingkit\webui\app.js;meetingkit\webui"
@@ -41,6 +42,8 @@ jobs:
           --version-file assets\version_info.txt
           --icon assets\app.ico
           run_app.py
+      - name: 验证便携程序转写 SDK
+        run: python scripts/check_frozen_runtime.py "dist/会议纪要助手.exe"
       - name: 生成 Windows 安装包
         shell: pwsh
         run: |
@@ -56,6 +59,8 @@ jobs:
             $process = Start-Process $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target" -Wait -PassThru
             if ($process.ExitCode -ne 0 -or !(Test-Path "$target/会议纪要助手.exe")) { throw "Install/upgrade failed" }
           }
+          python scripts/check_frozen_runtime.py "$target/会议纪要助手.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Installed runtime check failed" }
           $process = Start-Process "$target/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
           if ($process.ExitCode -ne 0 -or (Test-Path "$target/会议纪要助手.exe")) { throw "Uninstall failed" }
       - name: 上传安装包
@@ -90,6 +95,7 @@ jobs:
           pyinstaller --noconfirm --clean --windowed \
             --name "会议纪要助手" \
             --paths src \
+            --collect-all dashscope \
             --add-data "src/meetingkit/webui/index.html:meetingkit/webui" \
             --add-data "src/meetingkit/webui/styles.css:meetingkit/webui" \
             --add-data "src/meetingkit/webui/app.js:meetingkit/webui" \
@@ -101,10 +107,11 @@ jobs:
             --icon assets/app.icns \
             --osx-bundle-identifier com.meetingkit.app \
             run_app.py
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.2.2" "dist/会议纪要助手.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 0.2.2" "dist/会议纪要助手.app/Contents/Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 0.2.2" "dist/会议纪要助手.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 0.2.2" "dist/会议纪要助手.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.2.3" "dist/会议纪要助手.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 0.2.3" "dist/会议纪要助手.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 0.2.3" "dist/会议纪要助手.app/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 0.2.3" "dist/会议纪要助手.app/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 会议声音录制需要访问麦克风，用于录入您自己的发言" "dist/会议纪要助手.app/Contents/Info.plist"
           codesign --force --deep --sign - "dist/会议纪要助手.app"
+          python scripts/check_frozen_runtime.py "dist/会议纪要助手.app/Contents/MacOS/会议纪要助手"
           zip -q -r -y "dist/会议纪要助手-macOS.zip" "dist/会议纪要助手.app"
       - name: 上传产物
         uses: actions/upload-artifact@v4

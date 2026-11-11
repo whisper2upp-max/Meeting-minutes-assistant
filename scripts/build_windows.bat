@@ -10,6 +10,7 @@ if not exist .venv\Scripts\python.exe (
 .venv\Scripts\pyinstaller --noconfirm --clean --windowed --onefile ^
   --name "会议纪要助手" ^
   --paths src ^
+  --collect-all dashscope ^
   --add-data "src\meetingkit\webui\index.html;meetingkit\webui" ^
   --add-data "src\meetingkit\webui\styles.css;meetingkit\webui" ^
   --add-data "src\meetingkit\webui\app.js;meetingkit\webui" ^
@@ -24,6 +25,8 @@ if not exist .venv\Scripts\python.exe (
   --icon assets\app.ico ^
   run_app.py
 
+if errorlevel 1 exit /b 1
+.venv\Scripts\python scripts\check_frozen_runtime.py "dist\会议纪要助手.exe"
 if errorlevel 1 exit /b 1
 if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
   "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" scripts\windows_installer.iss

@@ -2,7 +2,7 @@
 
 支持公司专属网关（ws-*.maas.aliyuncs.com）：通过 base_url 参数覆盖官方端点，
 在首次 import dashscope 之前设置 DASHSCOPE_HTTP_BASE_URL 生效。
-依赖的 SDK 能力（dashscope>=1.27）：
+依赖的 SDK 能力（dashscope==1.27.2）：
 - dashscope.utils.oss_utils.OssUtils.upload  本地文件 -> oss:// 临时 URL（48 小时有效）
 - dashscope.audio.asr.transcription.Transcription.async_call / fetch
   注：oss:// URL 需要请求头 X-DashScope-OssResourceResolve: enable，转写接口不会自动添加。

@@ -6,6 +6,9 @@ import sys
 
 
 def run() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "--check-runtime":
+        from .runtime_check import main
+        raise SystemExit(main(sys.argv[2:]))
     try:
         from .webui.server import main as web_main
         web_main()
