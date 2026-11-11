@@ -1000,13 +1000,30 @@ class Api:
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
-    def save_minutes(self, path: str, content: str, decisions: dict = None) -> dict:
+    def save_minutes(self, path: str, content: str, decisions: dict = None,
+                     title: str = None) -> dict:
         try:
             p = self._safe_minutes_path(path)
-            p.write_text(content, encoding="utf-8")
+            if title is not None:
+                title = str(title).strip()
+                if not title or len(title) > 120 or "\n" in title or "\r" in title:
+                    raise ValueError("会议标题须为 1–120 个字符，不能包含换行")
             review_path = p.parent / "proofreading.json"
-            if decisions is not None and review_path.exists():
-                review = json.loads(review_path.read_text(encoding="utf-8"))
+            review = None
+            if decisions is not None:
+                if not isinstance(decisions, dict):
+                    raise ValueError("术语校对数据格式不正确")
+                review = (json.loads(review_path.read_text(encoding="utf-8"))
+                          if review_path.exists() else {"status": "unavailable", "uncertain": []})
+                known = {item["term"] for item in review.get("uncertain", [])}
+                for term, choice in decisions.items():
+                    if term in known or not isinstance(choice, dict) or choice.get("source") != "manual":
+                        continue
+                    if not isinstance(term, str) or not term.strip() or len(term) > 120 or "\n" in term or "\r" in term:
+                        raise ValueError("手动术语须为 1–120 个字符，不能包含换行")
+                    review.setdefault("uncertain", []).append({
+                        "term": term, "source": "manual", "reason": "手动添加，请确认准确名称", "decision": "pending"})
+                    known.add(term)
                 for item in review.get("uncertain", []):
                     choice = decisions.get(item["term"], "pending")
                     if isinstance(choice, dict):
@@ -1014,7 +1031,11 @@ class Api:
                         choice = choice.get("decision", "pending")
                         item["replacement"] = replacement if choice == "replaced" else ""
                     item["decision"] = choice if choice in ("confirmed", "replaced") else "pending"
+            p.write_text(content, encoding="utf-8")
+            if review is not None:
                 review_path.write_text(json.dumps(review, ensure_ascii=False), encoding="utf-8")
+            if title is not None:
+                pipeline_mod.save_session_metadata(p.parent, title=title)
             _state.log(f"纪要已保存：{p.name}")
             return {"ok": True}
         except Exception as exc:
