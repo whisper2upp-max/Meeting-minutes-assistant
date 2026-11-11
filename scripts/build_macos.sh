@@ -11,6 +11,7 @@ fi
 .venv/bin/pyinstaller --noconfirm --clean --windowed \
   --name "会议纪要助手" \
   --paths src \
+  --collect-all dashscope \
   --add-data "src/meetingkit/webui/index.html:meetingkit/webui/" \
   --add-data "src/meetingkit/webui/styles.css:meetingkit/webui/" \
   --add-data "src/meetingkit/webui/app.js:meetingkit/webui/" \
@@ -26,19 +27,20 @@ fi
 APP="dist/会议纪要助手.app"
 # 关键：没有 NSMicrophoneUsageDescription 的 app 请求麦克风时会被 macOS 直接
 # 静默拒绝（不弹授权框、不出现在隐私列表），必须注入声明后重新 ad-hoc 签名
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.2.2" \
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.2.3" \
   "$APP/Contents/Info.plist" 2>/dev/null || \
-/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 0.2.2" \
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 0.2.3" \
   "$APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 0.2.2" \
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 0.2.3" \
   "$APP/Contents/Info.plist" 2>/dev/null || \
-/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 0.2.2" \
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 0.2.3" \
   "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :NSMicrophoneUsageDescription 会议声音录制需要访问麦克风，用于录入您自己的发言" \
   "$APP/Contents/Info.plist" 2>/dev/null || \
 /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 会议声音录制需要访问麦克风，用于录入您自己的发言" \
   "$APP/Contents/Info.plist"
 codesign --force --deep --sign - "$APP" >/dev/null 2>&1
+.venv/bin/python scripts/check_frozen_runtime.py "$APP/Contents/MacOS/会议纪要助手"
 zip -q -r -y "dist/会议纪要助手-macOS.zip" "$APP"
 
 echo "打包完成：dist/会议纪要助手.app、dist/会议纪要助手-macOS.zip"
