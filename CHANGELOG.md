@@ -2,7 +2,8 @@
 
 ## v0.2.3 · 2026-11-11
 
-- 修复 Windows 录制结束后转写时出现 `No module named 'dashscope'` 的问题，固定兼容的百炼 SDK 并完整打包。
+- 修复 Windows 录制结束后转写时出现 `No module named 'dashscope'` 的问题，适配并完整打包百炼 SDK 2.0.4。
+- 保留已有 API Key、网关和输出目录；上传、提交及轮询均使用当前配置的网关。
 - Windows 便携程序、安装后的程序和 macOS 应用增加离线转写 SDK 加载检查，失败时阻止发布产物。
 
 ## v0.2.2 · 2026-11-10

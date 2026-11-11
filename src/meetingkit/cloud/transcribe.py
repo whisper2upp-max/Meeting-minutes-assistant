@@ -1,17 +1,16 @@
 """百炼录音文件转写（fun-asr）：本地文件上传临时存储 -> 异步转写 -> 轮询 -> 解析结果。
 
 支持公司专属网关（ws-*.maas.aliyuncs.com）：通过 base_url 参数覆盖官方端点，
-在首次 import dashscope 之前设置 DASHSCOPE_HTTP_BASE_URL 生效。
-依赖的 SDK 能力（dashscope==1.27.2）：
-- dashscope.utils.oss_utils.OssUtils.upload  本地文件 -> oss:// 临时 URL（48 小时有效）
-- dashscope.audio.asr.transcription.Transcription.async_call / fetch
+上传、提交和轮询均按请求传入 base_address，不依赖进程级缓存。
+依赖的 SDK 能力（dashscope==2.0.4，使用其官方保留的 ASR 兼容接口）：
+- dashscope.legacy_1x.utils.oss_utils.OssUtils.upload  本地文件 -> oss:// 临时 URL（48 小时有效）
+- dashscope.legacy_1x.audio.asr.transcription.Transcription.async_call / fetch
   注：oss:// URL 需要请求头 X-DashScope-OssResourceResolve: enable，转写接口不会自动添加。
 """
 
 from __future__ import annotations
 
 import json
-import os
 import time
 from pathlib import Path
 from typing import Callable, List, Mapping, Optional
@@ -25,23 +24,24 @@ Progress = Callable[[str, str], None]
 _POLL_INTERVAL_SEC = 5
 _POLL_TIMEOUT_SEC = 60 * 60  # 服务端最长支持 12 小时音频，留足裕量
 
-# 惰性加载：必须在设置 DASHSCOPE_HTTP_BASE_URL 之后才能 import dashscope
+# 显式使用 SDK 2.x 的实体路径，避免冻结打包遗漏动态别名。
 _sdk_cache = None
 
 
 def _sdk(base_url: str = ""):
     global _sdk_cache
     if _sdk_cache is None:
-        url = (base_url or "").strip().rstrip("/")
-        if url:
-            os.environ["DASHSCOPE_HTTP_BASE_URL"] = url
-        from dashscope.audio.asr.transcription import Transcription
-        from dashscope.common.error import DashScopeException
-        from dashscope.utils.oss_utils import OssUtils
+        from dashscope.legacy_1x.audio.asr.transcription import Transcription
+        from dashscope.legacy_1x.common.error import DashScopeException
+        from dashscope.legacy_1x.utils.oss_utils import OssUtils
         _sdk_cache = {"Transcription": Transcription,
                       "OssUtils": OssUtils,
                       "DashScopeException": DashScopeException}
     return _sdk_cache
+
+
+def _endpoint(base_url: str) -> str:
+    return (base_url or "https://dashscope.aliyuncs.com/api/v1").strip().rstrip("/")
 
 
 # 常见云端转写错误码 -> 可操作的中文提示
@@ -86,7 +86,7 @@ def upload_audio(file_path: Path, *, api_key: str, model: str, base_url: str = "
                              f"({file_path.stat().st_size / 1e6:.1f} MB)")
     try:
         oss_url, _ = sdk["OssUtils"].upload(model=model, file_path=str(file_path),
-                                            api_key=api_key)
+                                            api_key=api_key, base_address=_endpoint(base_url))
     except sdk["DashScopeException"] as exc:
         if is_certificate_verification_error(exc):
             raise _network_error("音频上传失败", exc) from exc
@@ -133,6 +133,7 @@ def transcribe_file(
             model=model,
             file_urls=[oss_url],
             api_key=api_key,
+            base_address=_endpoint(base_url),
             headers={"X-DashScope-OssResourceResolve": "enable"},
             **params,
         )
@@ -158,7 +159,8 @@ def transcribe_file(
             raise TranscribeError("转写超时（超过 60 分钟未完成）。")
         time.sleep(_POLL_INTERVAL_SEC)
         try:
-            task = sdk["Transcription"].fetch(task, api_key=api_key)
+            task = sdk["Transcription"].fetch(task, api_key=api_key,
+                                               base_address=_endpoint(base_url))
         except sdk["DashScopeException"] as exc:
             raise _network_error("查询转写任务失败", exc) from exc
         _log(progress, "transcribe",
