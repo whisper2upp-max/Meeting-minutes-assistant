@@ -30,7 +30,7 @@
       <button class="status-chip" id="statusChip" type="button">
         <span class="status-dot"></span><span id="statusText">本机就绪</span>
       </button>
-      <span class="version-chip" id="versionChip">v0.2.3</span>
+      <span class="version-chip" id="versionChip">v0.2.4</span>
       <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
         <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
       </button>
@@ -115,7 +115,7 @@
         <button class="shortcut-card release" id="btnChangelog" type="button">
           <span class="shortcut-index">04</span>
           <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
-          <strong>更新日志</strong><small>v0.2.3 · 会议工作区</small><i>查看变化 →</i>
+          <strong>更新日志</strong><small>v0.2.4 · 会议工作区</small><i>查看变化 →</i>
         </button>
       </div>
 
@@ -366,9 +366,11 @@
 
   <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
     <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.2.3</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
-      <div class="release-hero"><span>0.2.3</span><div><strong>录音转写兼容性修复</strong><small>2026-11-11</small></div></div>
+      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.2.4</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
+      <div class="release-hero"><span>0.2.4</span><div><strong>标题编辑与手动术语校对</strong><small>2026-11-11</small></div></div>
       <div class="release-list">
+        <article><span>NEW</span><div><h3>会议标题编辑</h3><p>直接点击标题修改，自动保存并同步首页、历史列表和正文标题。</p></div></article>
+        <article><span>NEW</span><div><h3>手动添加漏检术语</h3><p>在校对栏输入术语，查看出现次数，逐处定位、确认或全文替换，支持撤回并保存处理进度。</p></div></article>
         <article><span>FIXED</span><div><h3>录音转写依赖</h3><p>修复 Windows 录制完成后转写提示缺少 dashscope 模块的问题。</p></div></article>
         <article><span>FIXED</span><div><h3>输出目录入口</h3><p>“更多 → 打开文件夹”打开已配置的输出目录；偏好设置中的相关入口统一命名为“设置”。</p></div></article>
         <article><span>NEW</span><div><h3>Windows 安装向导</h3><p>支持选择安装位置、创建快捷方式和系统卸载入口；升级及卸载保留用户配置与会议资料。</p></div></article>

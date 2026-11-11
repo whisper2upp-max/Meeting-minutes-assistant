@@ -2,7 +2,7 @@
 
 > 会议纪要助手：同步录制会议内声与麦克风，或导入已有音视频，自动完成说话人分离、全文转写和结构化会议纪要。
 
-[![Version](https://img.shields.io/badge/version-0.2.3-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.2.4-665cff.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-18213d.svg)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0aa6b5.svg)
 
@@ -17,7 +17,7 @@
 | 平台 | 发布文件 | 首次启动 |
 | --- | --- | --- |
 | macOS | `会议纪要助手-macOS.zip` | 解压后将 App 移入“应用程序”，首次右键选择“打开” |
-| Windows | `Meeting-Minutes-Assistant-v0.2.3-Windows-x64-Setup.exe`（安装版） | 若 SmartScreen 提示，选择“更多信息 → 仍要运行” |
+| Windows | `Meeting-Minutes-Assistant-v0.2.4-Windows-x64-Setup.exe`（安装版） | 若 SmartScreen 提示，选择“更多信息 → 仍要运行” |
 
 详细说明：[macOS 使用指南](docs/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E-macOS.md) · [Windows 使用指南](docs/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E-Windows.md)
 
