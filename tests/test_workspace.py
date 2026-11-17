@@ -78,16 +78,28 @@ def test_video_disguised_as_audio_wav_has_correct_mime(tmp_path):
 
 def test_sessions_count_saved_decisions_and_workspace_scope(meeting, tmp_path):
     api = server.Api()
-    assert api.list_sessions()['sessions'][0]['pending_terms'] == 1
+    first = api.list_sessions()['sessions'][0]
+    assert first['pending_terms'] == 1
+    assert first['pending_preview'] == ['飞书妙季']
     assert api.save_minutes(str(meeting), '飞书妙记讨论。', {'飞书妙季': {'decision': 'replaced', 'replacement': '飞书妙记'}})['ok']
     session = api.list_sessions()['sessions'][0]
     assert session['pending_terms'] == 0
+    assert session['pending_preview'] == []
     assert session['total_terms'] == 1
     assert session['duration_seconds'] == 6
     assert api.get_minutes(str(meeting))['proofreading']['uncertain'][0]['replacement'] == '飞书妙记'
     assert not api.save_workspace({'last_minutes': str(tmp_path.parent / 'outside.md')})['ok']
     assert api.save_workspace({'last_minutes': str(meeting)})['ok']
     assert api.get_workspace()['last_minutes'] == str(meeting)
+
+
+def test_session_preview_includes_manual_terms_and_caps_only_the_preview(meeting):
+    review = {'uncertain': [{'term': '已确认', 'decision': 'confirmed'}, {'term': '手动', 'source': 'manual'},
+                            {'term': '术语二'}, {'term': '术语三'}, {'term': '术语四'}]}
+    (meeting.parent / 'proofreading.json').write_text(json.dumps(review), encoding='utf-8')
+    session = server.Api().list_sessions()['sessions'][0]
+    assert session['pending_terms'] == 4
+    assert session['pending_preview'] == ['手动', '术语二', '术语三']
 
 
 def test_dictionary_reference_reaches_generation_without_unrelated_terms(tmp_path, monkeypatch):

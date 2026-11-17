@@ -205,7 +205,14 @@ function setActiveView(name, force = false) {
   state.activeView = name;
   document.body.classList.toggle("minutes-mode", name === "minutes");
   qa("[data-view-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === name));
-  qa(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === name));
+  qa(".nav-item").forEach((item) => {
+    const current = item.dataset.view === name;
+    item.classList.toggle("active", current);
+    if (current) {
+      item.setAttribute("aria-current", "page");
+      $("currentViewName").textContent = item.textContent;
+    } else item.removeAttribute("aria-current");
+  });
 
   const progress = $("progressPanel");
   if (name === "record") {
@@ -1021,6 +1028,7 @@ async function openMinutes(path) {
   renderMinutesGeneration(state.status || {});
   renderSessionList();
   setActiveView("minutes", true);
+  return true;
 }
 
 function renderProofreading(review) {
@@ -1357,39 +1365,8 @@ function renderSessionList() {
   });
 }
 
-function renderRecent() {
-  $("metricMeetings").textContent = String(state.sessions.length);
-  $("sessionCount").textContent = `${state.sessions.length} 个纪要`;
-  const box = $("recentList");
-  box.replaceChildren();
-  if (!state.sessions.length) {
-    box.innerHTML = '<div class="empty-state"><span>还没有会议纪要</span><small>完成一次录制或导入后，会在这里出现。</small></div>';
-    return;
-  }
-  state.sessions.slice(0, 5).forEach((session) => {
-    const row = document.createElement("div");
-    row.className = "recent-row";
-    const date = document.createElement("span");
-    const copy = document.createElement("div");
-    const title = document.createElement("strong");
-    const meta = document.createElement("small");
-    const size = document.createElement("span");
-    const open = document.createElement("button");
-    date.className = "recent-date";
-    copy.className = "recent-copy";
-    size.className = "recent-size";
-    open.className = "recent-open";
-    date.textContent = (session.mtime || "-- --").split(" ")[0].replace("-", "/");
-    title.textContent = sessionTitle(session);
-    meta.textContent = `${session.mtime || "本机纪要"} · ${session.detail_label || "简要"}纪要`;
-    size.textContent = `${session.size_kb || 0} KB`;
-    open.textContent = "编辑纪要";
-    copy.append(title, meta);
-    open.addEventListener("click", () => openMinutes(session.minutes));
-    row.append(date, copy, size, open);
-    box.appendChild(row);
-  });
-}
+// The workspace script installs the meeting table before the desktop bridge is ready.
+let renderRecent = () => {};
 
 async function loadSessions() {
   if (!state.apiReady) return;
@@ -1486,7 +1463,6 @@ function bindEvents() {
   $("btnChangelog").addEventListener("click", () => openOverlay("changelogOverlay"));
   $("btnSettings").addEventListener("click", openSettings);
   $("btnOutput").addEventListener("click", openOutputFolder);
-  $("btnAllMinutes").addEventListener("click", () => setActiveView("minutes"));
   $("btnRefresh").addEventListener("click", async () => {
     await stopMicTest(true);
     await loadDevices();
@@ -1538,7 +1514,7 @@ function bindEvents() {
 
   $("sessionSearch").addEventListener("input", renderSessionList);
   $("btnRefreshSessions").addEventListener("click", loadSessions);
-  $("minutesBody").addEventListener("input", markDirty);
+  $("minutesBody").addEventListener("input", () => markDirty());
   $("minutesBody").addEventListener("click", updateTableControls);
   $("minutesBody").addEventListener("keyup", updateTableControls);
   $("btnSaveMinutes").addEventListener("click", saveMinutes);
@@ -1601,8 +1577,6 @@ async function initializeDesktop() {
   setAttendees("record", []);
   setAttendees("import", []);
   setAttendees("settings", state.attendeeSuggestions);
-  $("metricTranscribe").textContent = config.transcribe_model || "fun-asr";
-  $("metricMinutes").textContent = config.llm_model || "qwen-flash";
   window.setInterval(pollStatus, 650);
 }
 

@@ -1112,8 +1112,10 @@ class Api:
                     review = json.loads((d / "proofreading.json").read_text(encoding="utf-8"))
                 except (OSError, ValueError):
                     pass
-                pending = sum(1 for item in review.get("uncertain", [])
-                              if item.get("term") and item.get("decision") not in ("confirmed", "replaced"))
+                review = review if isinstance(review, dict) else {}
+                items = review.get("uncertain")
+                terms = [item for item in items if isinstance(item, dict) and item.get("term")] if isinstance(items, list) else []
+                pending = [item["term"] for item in terms if item.get("decision") not in ("confirmed", "replaced")]
                 duration = float(metadata.get("duration_seconds", 0) or 0)
                 if not duration:
                     try:
@@ -1124,8 +1126,9 @@ class Api:
                 out.append({"duration_seconds": duration, "title": metadata.get("title") or d.name,
                             "attendees": metadata["attendees"],
                             "started_at": metadata.get("started_at", ""),
-                            "total_terms": len(review.get("uncertain", [])),
-                            "pending_terms": pending,
+                            "total_terms": len(terms),
+                            "pending_terms": len(pending),
+                            "pending_preview": pending[:3],
                             "review_status": review.get("status", "unknown"), "name": d.name,
                             "minutes": str(m),
                             "transcript": str(transcript) if transcript.exists() else "",
@@ -1247,7 +1250,7 @@ def main() -> None:
             js_api=api,
             width=1280, height=840,
             min_size=(1040, 720),
-            background_color="#f3f6fc",
+            background_color="#f7f7fa",
         )
         autotest = os.environ.get("MEETINGKIT_AUTOTEST")
         if not autotest and Path("/tmp/mk_autotest").exists():

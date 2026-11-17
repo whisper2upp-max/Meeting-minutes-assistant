@@ -15,119 +15,67 @@
       </span>
       <span class="brand-copy">
         <strong>会议纪要助手</strong>
-        <small>MEETING WORKSPACE</small>
+        <small>MEETING NOTES</small>
       </span>
     </a>
 
     <nav class="main-nav" aria-label="主导航">
-      <button class="nav-item active" data-view="home">工作台</button>
-      <button class="nav-item" data-view="record">会议录制</button>
-      <button class="nav-item" data-view="import">导入生成</button>
-      <button class="nav-item" data-view="minutes">纪要编辑</button>
+      <button type="button" class="nav-item active" aria-current="page" data-view="home" title="工作台" aria-label="工作台"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3zM9 20v-7h6v7"/></svg><span>工作台</span></button>
+      <button type="button" class="nav-item" data-view="record" title="会议录制" aria-label="会议录制"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg><span>会议录制</span></button>
+      <button type="button" class="nav-item" data-view="import" title="导入生成" aria-label="导入生成"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v5h16v-5M12 16V3m-5 5 5-5 5 5"/></svg><span>导入生成</span></button>
+      <button type="button" class="nav-item" data-view="minutes" title="纪要编辑" aria-label="纪要编辑"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5zM14 3v6h5M9 13h6M9 17h6"/></svg><span>纪要编辑</span></button>
     </nav>
-
+    <nav class="rail-tools" aria-label="工具与帮助">
+      <button type="button" class="rail-tool" id="btnDictionary" title="个人术语库" aria-label="个人术语库"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4z"/></svg><span>个人术语库</span></button>
+      <button type="button" class="rail-tool" id="btnGuide" title="使用说明" aria-label="使用说明"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h6q3 0 3 3 0-3 3-3h6v14h-6q-3 0-3 2-1-2-3-2H3zM12 7v13"/></svg><span>使用说明</span></button>
+      <button type="button" class="rail-tool" id="btnChangelog" title="更新日志" aria-label="更新日志"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1"/></svg><span>更新日志</span></button>
+      <button type="button" class="rail-tool" id="btnSettings" title="偏好设置" aria-label="偏好设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><rect x="8" y="4" width="4" height="6" rx="1" fill="white"/><rect x="14" y="14" width="4" height="6" rx="1" fill="white"/></svg><span>偏好设置</span></button>
+    </nav>
+  </header>
+  <div class="workspace-strip">
+    <span class="workspace-crumb">个人工作区 <i aria-hidden="true">/</i> <b id="currentViewName">工作台</b></span>
     <div class="header-actions">
       <button class="status-chip" id="statusChip" type="button">
         <span class="status-dot"></span><span id="statusText">本机就绪</span>
       </button>
-      <span class="version-chip" id="versionChip">v0.2.4</span>
+      <span class="version-chip" id="versionChip">v0.3.0</span>
       <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
         <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
       </button>
-      <button class="icon-button" id="btnSettings" type="button" title="设置" aria-label="打开设置">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 1 1 4.4 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1A2 2 0 1 1 19.6 7l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.3a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-      </button>
     </div>
-  </header>
+  </div>
 
   <main class="app-shell">
-    <section class="view active" id="viewHome" data-view-panel="home">
-      <div class="hero-card">
-        <div class="hero-copy">
-          <div class="eyebrow"><span></span> LOCAL-FIRST MEETING INTELLIGENCE</div>
-          <h1>把每场会议，<br><em>变成清晰的下一步。</em></h1>
-          <p>同时录下会议内声与麦克风，自动完成说话人分离、全文转写和结构化纪要。音频留在本机，工作流一气呵成。</p>
-          <div class="hero-actions">
-            <button class="button primary" type="button" data-view="record">
-              <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>
-              开始一场会议
-            </button>
-            <button class="button secondary" type="button" data-view="import">导入已有录音</button>
-          </div>
-          <div class="hero-metrics">
-            <div><strong id="metricMeetings">0</strong><span>已生成纪要</span></div>
-            <div><strong id="metricTranscribe">fun-asr</strong><span>转写模型</span></div>
-            <div><strong id="metricMinutes">qwen-flash</strong><span>纪要模型</span></div>
-          </div>
-        </div>
-
-        <div class="flow-map" aria-label="会议处理流程">
-          <div class="flow-map-head">
-            <span><i></i> 工作流在线</span>
-            <small>4 STAGES</small>
-          </div>
-          <div class="flow-track">
-            <div class="flow-node hot">
-              <b>01</b><span class="flow-icon red"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/></svg></span>
-              <div><strong>录制 / 导入</strong><small>内声 + 麦克风</small></div>
-            </div>
-            <div class="flow-connector"><span></span></div>
-            <div class="flow-node">
-              <b>02</b><span class="flow-icon"><svg viewBox="0 0 24 24"><path d="M4 14.5V20h16v-5.5M8 9l4-4 4 4M12 5v11"/></svg></span>
-              <div><strong>百炼上传</strong><small>临时云端存储</small></div>
-            </div>
-            <div class="flow-connector"><span></span></div>
-            <div class="flow-node">
-              <b>03</b><span class="flow-icon cyan"><svg viewBox="0 0 24 24"><path d="M3 12h3l2-5 4 10 3-8 2 3h4"/></svg></span>
-              <div><strong>智能转写</strong><small>说话人自动分离</small></div>
-            </div>
-            <div class="flow-connector"><span></span></div>
-            <div class="flow-node">
-              <b>04</b><span class="flow-icon violet"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg></span>
-              <div><strong>纪要生成</strong><small>可编辑 Markdown</small></div>
-            </div>
-          </div>
-          <div class="flow-map-foot"><span>音频和纪要保存在你的电脑</span><b>LOCAL OUTPUT</b></div>
+    <section class="view active workspace-home" id="viewHome" data-view-panel="home">
+      <div class="w-page-heading">
+        <div><div class="w-date"></div><h1>会议工作台</h1></div>
+        <div class="w-home-actions">
+          <button class="w-btn" data-view="import" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v5h16v-5M12 16V3m-5 5 5-5 5 5"/></svg>导入文件</button>
+          <button class="w-btn primary" data-view="record" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>开始会议</button>
         </div>
       </div>
-
-      <div class="section-heading">
-        <div><span class="eyebrow simple">START HERE</span><h2>会议工作台</h2></div>
-        <p>从实时会议开始，或继续整理历史纪要。</p>
+      <div class="w-home-lead">
+        <section class="w-resume" aria-labelledby="resumeTitle">
+          <canvas class="soundprint" aria-hidden="true"></canvas>
+          <div class="w-resume-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5zM14 3v6h5M9 13h6M9 17h6"/></svg><span id="resumeLabel">继续上次编辑</span></div>
+          <h2 id="resumeTitle"></h2><p id="resumeMeta"></p>
+          <div class="w-resume-bottom"><button type="button" class="w-btn" id="resumeAction"></button><small id="resumeStatus"></small></div>
+        </section>
+        <section class="w-queue" aria-labelledby="queueTitle">
+          <header><h2 id="queueTitle">校对待办</h2><span id="queueCount" class="w-tag amber">0 项</span></header>
+          <div id="queueItems"></div>
+        </section>
       </div>
-
-      <div class="shortcut-grid">
-        <button class="shortcut-card record" type="button" data-view="record">
-          <span class="shortcut-index">01</span>
-          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg></span>
-          <strong>会议录制</strong><small>实时捕捉内声与发言</small><i>开始录音 →</i>
-        </button>
-        <button class="shortcut-card import" type="button" data-view="import">
-          <span class="shortcut-index">02</span>
-          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 14v6h16v-6M8 9l4-4 4 4M12 5v11"/></svg></span>
-          <strong>导入生成</strong><small>处理现有音频或视频</small><i>选择文件 →</i>
-        </button>
-        <button class="shortcut-card guide" id="btnGuide" type="button">
-          <span class="shortcut-index">03</span>
-          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h7a3 3 0 0 1 3 3v13a3 3 0 0 0-3-3H4z"/><path d="M20 4h-3a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h3z"/></svg></span>
-          <strong>使用说明</strong><small>首次配置与完整流程</small><i>阅读指南 →</i>
-        </button>
-        <button class="shortcut-card release" id="btnChangelog" type="button">
-          <span class="shortcut-index">04</span>
-          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
-          <strong>更新日志</strong><small>v0.2.4 · 会议工作区</small><i>查看变化 →</i>
-        </button>
-      </div>
-
-      <section class="recent-panel">
-        <div class="panel-head">
-          <div><span class="eyebrow simple">RECENT</span><h2>最近的会议</h2></div>
-          <button class="text-button" id="btnAllMinutes" type="button">进入纪要工作区 →</button>
+      <section class="w-meetings" aria-labelledby="meetingsTitle">
+        <div class="w-section-head"><h2 id="meetingsTitle">会议记录 <span id="wMeetingCount" class="w-tag">0</span></h2>
+          <div class="w-table-tools">
+            <div id="wFilters" role="group" aria-label="校对状态"><button type="button" class="w-filter" value="all">全部</button><button type="button" class="w-filter" value="pending">待校对</button></div>
+            <label class="w-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input type="search" id="wHomeSearch" placeholder="搜索会议" aria-label="搜索会议名称"></label>
+          </div>
         </div>
-        <div class="recent-list" id="recentList">
-          <div class="empty-state"><span>还没有会议纪要</span><small>完成一次录制或导入后，会在这里出现。</small></div>
-        </div>
+        <div class="w-table-scroll"><table><thead><tr><th>会议名称</th><th>开始时间</th><th>时长</th><th>校对状态</th><th></th></tr></thead><tbody id="recentList"></tbody></table></div>
       </section>
+      <footer class="w-home-footer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h6l2 3h10v11H3zM3 6V4h6l2 2h8v3"/></svg><span>会议文件保存在本机</span></footer>
     </section>
 
     <section class="view" id="viewRecord" data-view-panel="record">
@@ -280,6 +228,7 @@
           <div class="editor-toolbar" id="editorToolbar" aria-label="编辑工具栏">
             <select id="blockFormat" disabled aria-label="段落格式"><option value="p">正文</option><option value="h1">一级标题</option><option value="h2">二级标题</option><option value="h3">三级标题</option><option value="h4">四级标题</option><option value="h5">五级标题</option><option value="h6">六级标题</option><option value="blockquote">引用</option></select>
             <span class="tool-divider"></span>
+            <button type="button" id="btnPlainPaste" title="以当前段落样式粘贴文字" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v14h16V6a2 2 0 0 0-2-2h-3M9 3h6v4H9zM8 12h8M8 16h6"/></svg>粘贴为纯文本</button>
             <button data-command="bold" type="button" disabled title="粗体"><b>B</b></button>
             <button data-command="italic" type="button" disabled title="斜体"><i>I</i></button>
             <button data-command="insertUnorderedList" type="button" disabled title="无序列表">•≡</button>
@@ -354,10 +303,10 @@
     <section class="modal content-modal">
       <div class="modal-head"><div><span class="eyebrow simple">GETTING STARTED</span><h2 id="guideTitle">使用说明</h2><p>三分钟完成首次配置，之后打开即用。</p></div><button class="modal-close" data-close="guideOverlay" type="button">×</button></div>
       <div class="guide-steps">
-        <article><b>01</b><div><h3>配置百炼 API</h3><p>点击右上角设置，填写 API Key。公司有专属网关时再填写 API Host。</p></div></article>
+        <article><b>01</b><div><h3>配置百炼 API</h3><p>打开左栏下方的「偏好设置 → 设置」，填写 API Key。公司有专属网关时再填写 API Host。</p></div></article>
         <article><b>02</b><div><h3>选择方式与详细程度</h3><p>实时会议使用“会议录制”，已有音视频使用“导入生成”；开始前选择简要、标准或详细档。</p></div></article>
         <article><b>03</b><div><h3>添加参会人并处理</h3><p>用姓名标签添加本场参会人；录制中如需旁聊，可暂停麦克风外录而不中断会议内声。程序随后依次完成上传、转写和纪要生成。</p></div></article>
-        <article><b>04</b><div><h3>编辑、匹配与管理存储</h3><p>在纪要工作区校对内容、匹配说话人、换档重新生成；确认结果后可按会议清理原始双轨或全部音频。</p></div></article>
+        <article><b>04</b><div><h3>编辑、匹配与管理存储</h3><p>在纪要工作区校对内容、匹配说话人、换档重新生成；从其他应用复制的文字可直接粘贴，沿用正文样式。确认结果后可按会议清理原始双轨或全部音频。</p></div></article>
       </div>
       <div class="guide-tip"><strong>隐私提示</strong><span>会议音频和结果默认保存在本机；转写时音频会临时上传到配置的百炼服务。</span></div>
       <div class="modal-foot"><button class="button primary" data-close="guideOverlay" type="button">知道了</button></div>
@@ -366,9 +315,11 @@
 
   <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
     <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.2.4</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
-      <div class="release-hero"><span>0.2.4</span><div><strong>标题编辑与手动术语校对</strong><small>2026-11-11</small></div></div>
+      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.3.0</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
+      <div class="release-hero"><span>0.3.0</span><div><strong>声纹工作台</strong><small>2026-11-18</small></div></div>
       <div class="release-list">
+        <article><span>NEW</span><div><h3>声纹工作台与左侧导航</h3><p>继续上次编辑，或从校对待办直接定位术语。个人术语库、使用说明、更新日志和偏好设置集中在左栏下方。</p></div></article>
+        <article><span>NEW</span><div><h3>粘贴为纯文本</h3><p>在纪要正文中粘贴时沿用当前段落的样式，也可使用编辑工具栏的粘贴按钮。</p></div></article>
         <article><span>NEW</span><div><h3>会议标题编辑</h3><p>直接点击标题修改，自动保存并同步首页、历史列表和正文标题。</p></div></article>
         <article><span>NEW</span><div><h3>手动添加漏检术语</h3><p>在校对栏输入术语，查看出现次数，逐处定位、确认或全文替换，支持撤回并保存处理进度。</p></div></article>
         <article><span>FIXED</span><div><h3>录音转写依赖</h3><p>修复 Windows 录制完成后转写提示缺少 dashscope 模块的问题。</p></div></article>
