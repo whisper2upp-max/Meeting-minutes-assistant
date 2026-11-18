@@ -15,119 +15,67 @@
       </span>
       <span class="brand-copy">
         <strong>会议纪要助手</strong>
-        <small>MEETING WORKSPACE</small>
+        <small>MEETING NOTES</small>
       </span>
     </a>
 
     <nav class="main-nav" aria-label="主导航">
-      <button class="nav-item active" data-view="home">工作台</button>
-      <button class="nav-item" data-view="record">会议录制</button>
-      <button class="nav-item" data-view="import">导入生成</button>
-      <button class="nav-item" data-view="minutes">纪要编辑</button>
+      <button type="button" class="nav-item active" aria-current="page" data-view="home" title="工作台" aria-label="工作台"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3zM9 20v-7h6v7"/></svg><span>工作台</span></button>
+      <button type="button" class="nav-item" data-view="record" title="会议录制" aria-label="会议录制"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg><span>会议录制</span></button>
+      <button type="button" class="nav-item" data-view="import" title="导入生成" aria-label="导入生成"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v5h16v-5M12 16V3m-5 5 5-5 5 5"/></svg><span>导入生成</span></button>
+      <button type="button" class="nav-item" data-view="minutes" title="纪要编辑" aria-label="纪要编辑"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5zM14 3v6h5M9 13h6M9 17h6"/></svg><span>纪要编辑</span></button>
     </nav>
-
+    <nav class="rail-tools" aria-label="工具与帮助">
+      <button type="button" class="rail-tool" id="btnDictionary" title="个人术语库" aria-label="个人术语库"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4z"/></svg><span>个人术语库</span></button>
+      <button type="button" class="rail-tool" id="btnGuide" title="使用说明" aria-label="使用说明"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h6q3 0 3 3 0-3 3-3h6v14h-6q-3 0-3 2-1-2-3-2H3zM12 7v13"/></svg><span>使用说明</span></button>
+      <button type="button" class="rail-tool" id="btnChangelog" title="更新日志" aria-label="更新日志"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1"/></svg><span>更新日志</span></button>
+      <button type="button" class="rail-tool" id="btnSettings" title="偏好设置" aria-label="偏好设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><rect x="8" y="4" width="4" height="6" rx="1" fill="white"/><rect x="14" y="14" width="4" height="6" rx="1" fill="white"/></svg><span>偏好设置</span></button>
+    </nav>
+  </header>
+  <div class="workspace-strip">
+    <span class="workspace-crumb">个人工作区 <i aria-hidden="true">/</i> <b id="currentViewName">工作台</b></span>
     <div class="header-actions">
       <button class="status-chip" id="statusChip" type="button">
         <span class="status-dot"></span><span id="statusText">本机就绪</span>
       </button>
-      <span class="version-chip" id="versionChip">v0.2.4</span>
+      <span class="version-chip" id="versionChip">v0.3.0</span>
       <button class="icon-button" id="btnOutput" type="button" title="打开输出目录" aria-label="打开输出目录">
         <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8V5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2.5"/></svg>
       </button>
-      <button class="icon-button" id="btnSettings" type="button" title="设置" aria-label="打开设置">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 1 1 4.4 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1A2 2 0 1 1 19.6 7l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.3a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-      </button>
     </div>
-  </header>
+  </div>
 
   <main class="app-shell">
-    <section class="view active" id="viewHome" data-view-panel="home">
-      <div class="hero-card">
-        <div class="hero-copy">
-          <div class="eyebrow"><span></span> LOCAL-FIRST MEETING INTELLIGENCE</div>
-          <h1>把每场会议，<br><em>变成清晰的下一步。</em></h1>
-          <p>同时录下会议内声与麦克风，自动完成说话人分离、全文转写和结构化纪要。音频留在本机，工作流一气呵成。</p>
-          <div class="hero-actions">
-            <button class="button primary" type="button" data-view="record">
-              <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>
-              开始一场会议
-            </button>
-            <button class="button secondary" type="button" data-view="import">导入已有录音</button>
-          </div>
-          <div class="hero-metrics">
-            <div><strong id="metricMeetings">0</strong><span>已生成纪要</span></div>
-            <div><strong id="metricTranscribe">fun-asr</strong><span>转写模型</span></div>
-            <div><strong id="metricMinutes">qwen-flash</strong><span>纪要模型</span></div>
-          </div>
-        </div>
-
-        <div class="flow-map" aria-label="会议处理流程">
-          <div class="flow-map-head">
-            <span><i></i> 工作流在线</span>
-            <small>4 STAGES</small>
-          </div>
-          <div class="flow-track">
-            <div class="flow-node hot">
-              <b>01</b><span class="flow-icon red"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/></svg></span>
-              <div><strong>录制 / 导入</strong><small>内声 + 麦克风</small></div>
-            </div>
-            <div class="flow-connector"><span></span></div>
-            <div class="flow-node">
-              <b>02</b><span class="flow-icon"><svg viewBox="0 0 24 24"><path d="M4 14.5V20h16v-5.5M8 9l4-4 4 4M12 5v11"/></svg></span>
-              <div><strong>百炼上传</strong><small>临时云端存储</small></div>
-            </div>
-            <div class="flow-connector"><span></span></div>
-            <div class="flow-node">
-              <b>03</b><span class="flow-icon cyan"><svg viewBox="0 0 24 24"><path d="M3 12h3l2-5 4 10 3-8 2 3h4"/></svg></span>
-              <div><strong>智能转写</strong><small>说话人自动分离</small></div>
-            </div>
-            <div class="flow-connector"><span></span></div>
-            <div class="flow-node">
-              <b>04</b><span class="flow-icon violet"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg></span>
-              <div><strong>纪要生成</strong><small>可编辑 Markdown</small></div>
-            </div>
-          </div>
-          <div class="flow-map-foot"><span>音频和纪要保存在你的电脑</span><b>LOCAL OUTPUT</b></div>
+    <section class="view active workspace-home" id="viewHome" data-view-panel="home">
+      <div class="w-page-heading">
+        <div><div class="w-date"></div><h1>会议工作台</h1></div>
+        <div class="w-home-actions">
+          <button class="w-btn" data-view="import" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v5h16v-5M12 16V3m-5 5 5-5 5 5"/></svg>导入文件</button>
+          <button class="w-btn primary" data-view="record" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>开始会议</button>
         </div>
       </div>
-
-      <div class="section-heading">
-        <div><span class="eyebrow simple">START HERE</span><h2>会议工作台</h2></div>
-        <p>从实时会议开始，或继续整理历史纪要。</p>
+      <div class="w-home-lead">
+        <section class="w-resume" aria-labelledby="resumeTitle">
+          <canvas class="soundprint" aria-hidden="true"></canvas>
+          <div class="w-resume-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5zM14 3v6h5M9 13h6M9 17h6"/></svg><span id="resumeLabel">继续上次编辑</span></div>
+          <h2 id="resumeTitle"></h2><p id="resumeMeta"></p>
+          <div class="w-resume-bottom"><button type="button" class="w-btn" id="resumeAction"></button><small id="resumeStatus"></small></div>
+        </section>
+        <section class="w-queue" aria-labelledby="queueTitle">
+          <header><h2 id="queueTitle">校对待办</h2><span id="queueCount" class="w-tag amber">0 项</span></header>
+          <div id="queueItems"></div>
+        </section>
       </div>
-
-      <div class="shortcut-grid">
-        <button class="shortcut-card record" type="button" data-view="record">
-          <span class="shortcut-index">01</span>
-          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg></span>
-          <strong>会议录制</strong><small>实时捕捉内声与发言</small><i>开始录音 →</i>
-        </button>
-        <button class="shortcut-card import" type="button" data-view="import">
-          <span class="shortcut-index">02</span>
-          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 14v6h16v-6M8 9l4-4 4 4M12 5v11"/></svg></span>
-          <strong>导入生成</strong><small>处理现有音频或视频</small><i>选择文件 →</i>
-        </button>
-        <button class="shortcut-card guide" id="btnGuide" type="button">
-          <span class="shortcut-index">03</span>
-          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h7a3 3 0 0 1 3 3v13a3 3 0 0 0-3-3H4z"/><path d="M20 4h-3a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h3z"/></svg></span>
-          <strong>使用说明</strong><small>首次配置与完整流程</small><i>阅读指南 →</i>
-        </button>
-        <button class="shortcut-card release" id="btnChangelog" type="button">
-          <span class="shortcut-index">04</span>
-          <span class="shortcut-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
-          <strong>更新日志</strong><small>v0.2.4 · 会议工作区</small><i>查看变化 →</i>
-        </button>
-      </div>
-
-      <section class="recent-panel">
-        <div class="panel-head">
-          <div><span class="eyebrow simple">RECENT</span><h2>最近的会议</h2></div>
-          <button class="text-button" id="btnAllMinutes" type="button">进入纪要工作区 →</button>
+      <section class="w-meetings" aria-labelledby="meetingsTitle">
+        <div class="w-section-head"><h2 id="meetingsTitle">会议记录 <span id="wMeetingCount" class="w-tag">0</span></h2>
+          <div class="w-table-tools">
+            <div id="wFilters" role="group" aria-label="校对状态"><button type="button" class="w-filter" value="all">全部</button><button type="button" class="w-filter" value="pending">待校对</button></div>
+            <label class="w-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input type="search" id="wHomeSearch" placeholder="搜索会议" aria-label="搜索会议名称"></label>
+          </div>
         </div>
-        <div class="recent-list" id="recentList">
-          <div class="empty-state"><span>还没有会议纪要</span><small>完成一次录制或导入后，会在这里出现。</small></div>
-        </div>
+        <div class="w-table-scroll"><table><thead><tr><th>会议名称</th><th>开始时间</th><th>时长</th><th>校对状态</th><th></th></tr></thead><tbody id="recentList"></tbody></table></div>
       </section>
+      <footer class="w-home-footer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h6l2 3h10v11H3zM3 6V4h6l2 2h8v3"/></svg><span>会议文件保存在本机</span></footer>
     </section>
 
     <section class="view" id="viewRecord" data-view-panel="record">
@@ -250,7 +198,7 @@
           <button class="button secondary compact" id="btnSpeakerMapping" type="button" disabled>匹配参会人</button>
           <button class="button secondary compact" id="btnTranscript" type="button" disabled>查看转写</button>
           <button class="button secondary compact" id="btnAudioCleanup" type="button" disabled>清理音频</button>
-          <button class="button secondary compact" id="btnOpenFolder" type="button" disabled>打开文件夹</button>
+          <button class="button secondary compact" id="btnOpenFolder" type="button" disabled>打开本场会议文件夹</button>
           <button class="button secondary compact" id="btnExport" type="button" disabled>导出</button>
           <button class="button primary compact" id="btnSaveMinutes" type="button" disabled>保存纪要</button>
         </div>
@@ -350,60 +298,335 @@
     </section>
   </div>
 
+  <!-- BEGIN offline help -->
   <div class="overlay hidden" id="guideOverlay" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
-    <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">GETTING STARTED</span><h2 id="guideTitle">使用说明</h2><p>三分钟完成首次配置，之后打开即用。</p></div><button class="modal-close" data-close="guideOverlay" type="button">×</button></div>
-      <div class="guide-steps">
-        <article><b>01</b><div><h3>配置百炼 API</h3><p>点击右上角设置，填写 API Key。公司有专属网关时再填写 API Host。</p></div></article>
-        <article><b>02</b><div><h3>选择方式与详细程度</h3><p>实时会议使用“会议录制”，已有音视频使用“导入生成”；开始前选择简要、标准或详细档。</p></div></article>
-        <article><b>03</b><div><h3>添加参会人并处理</h3><p>用姓名标签添加本场参会人；录制中如需旁聊，可暂停麦克风外录而不中断会议内声。程序随后依次完成上传、转写和纪要生成。</p></div></article>
-        <article><b>04</b><div><h3>编辑、匹配与管理存储</h3><p>在纪要工作区校对内容、匹配说话人、换档重新生成；确认结果后可按会议清理原始双轨或全部音频。</p></div></article>
-      </div>
-      <div class="guide-tip"><strong>隐私提示</strong><span>会议音频和结果默认保存在本机；转写时音频会临时上传到配置的百炼服务。</span></div>
-      <div class="modal-foot"><button class="button primary" data-close="guideOverlay" type="button">知道了</button></div>
+    <section class="modal help-modal">
+      <header class="modal-head"><div><h2 id="guideTitle">使用说明</h2><p>选择主题，或搜索操作名称。</p></div>
+        <button class="modal-close" data-close="guideOverlay" type="button" aria-label="关闭使用说明">×</button></header>
+      <div class="guide-search"><input type="search" id="guideQuery" aria-label="搜索使用说明" placeholder="搜索功能或问题，例如「粘贴」「麦克风」"></div>
+<div class="guide-layout"><nav id="guideTopics" aria-label="使用说明目录">
+<button type="button" aria-controls="helpTopic0" aria-current="true">选择会议来源</button>
+<button type="button" aria-controls="helpTopic1">首次配置</button>
+<button type="button" aria-controls="helpTopic2">工作台与历史会议</button>
+<button type="button" aria-controls="helpTopic3">现场会议录制</button>
+<button type="button" aria-controls="helpTopic4">已有文件导入</button>
+<button type="button" aria-controls="helpTopic5">纪要档位与处理进度</button>
+<button type="button" aria-controls="helpTopic6">编辑标题、正文与表格</button>
+<button type="button" aria-controls="helpTopic7">术语校对与个人术语库</button>
+<button type="button" aria-controls="helpTopic8">匹配参会人与试听原文</button>
+<button type="button" aria-controls="helpTopic9">重新生成、保存与导出</button>
+<button type="button" aria-controls="helpTopic10">管理文件与释放空间</button>
+<button type="button" aria-controls="helpTopic11">常见问题</button>
+</nav><div class="guide-reading">
+<article id="helpTopic0" tabindex="0"><h3>选择会议来源</h3>
+<p>根据手头的材料，选择一种方式开始。</p>
+<ul class="guide-choices">
+<li><button type="button" data-guide-target="helpTopic3"><strong>会议正在进行</strong><span>打开「会议录制」，录下会议内声和麦克风。</span></button></li>
+<li><button type="button" data-guide-target="helpTopic4"><strong>已有录音或视频</strong><span>打开「导入生成」，直接选择音频文件或 Teams 录屏。</span></button></li>
+</ul>
+<p>两种方式都会生成纪要。生成后，在「纪要编辑」核对术语、匹配参会人并导出。</p></article>
+<article id="helpTopic1" tabindex="0" hidden><h3>首次配置</h3>
+<h4>连接百炼</h4>
+<p>打开左栏底部的「偏好设置」，在「模型、设备与输出目录」一行点「设置」。填入百炼 API Key。使用官方服务时，API 网关留空即可。使用公司专属网关时，填写管理员提供的服务域名。保存后，录制和导入共用这份配置。</p>
+<h4>选择文件保存位置</h4>
+<p>在同一个设置页点「输出目录」旁的「浏览」，选择一个有写入权限的文件夹。程序在这里为每场会议建立子文件夹。在工作台点右上角的文件夹图标，可查看所有会议。更换目录后，工作台显示新目录中的会议，原目录的文件仍留在原处。</p>
+<h4>阅读与参会人偏好</h4>
+<p>在「偏好设置」中调整正文字号或打开「减少动态效果」。字号只影响屏幕阅读。经常一起开会的人可以先加到设置里的「常用参会人」，录制或导入时再点选本场出席者，也可以直接粘贴多行姓名。</p></article>
+<article id="helpTopic2" tabindex="0" hidden><h3>工作台与历史会议</h3>
+<h4>接着编辑上次的纪要</h4>
+<p>点首页封面上的「继续编辑」，可回到上次打开的会议。首次使用时，可以直接点「开始会议」或「导入文件」。编辑页左侧的会议列表也可以搜索和切换历史记录。</p>
+<h4>先看还有哪些词要核对</h4>
+<p>「校对待办」显示待处理术语的总数，并列出前三项。点击术语，直接打开对应会议并定位到正文。「会议记录」中的「待校对」会筛出所有仍有待确认术语的会议，可再按会议名称搜索。</p></article>
+<article id="helpTopic3" tabindex="0" hidden><h3>现场会议录制</h3>
+<h4>开始前先选声源</h4>
+<p>会议内声记录对方和共享内容的播放声音，麦克风外录记录你这边的声音。在「会议录制」填好标题、参会人和纪要档位后，检查两路设备，再点「开始录音」。</p>
+<ul>
+<li>Windows 使用系统默认输出设备内录。让会议软件的扬声器与 Windows 默认输出指向同一副耳机或音箱。麦克风选「电脑默认外录」会使用开始录制时的默认输入，也可从列表固定选择一个设备。插拔耳机后可点「刷新设备」。</li>
+<li>Windows 的「测试麦克风」可以先看音量条，再从当前耳机或扬声器听自己的声音。说话时音量没有变化，先检查系统麦克风权限和所选输入设备。</li>
+<li>macOS 首次内录时按提示安装随应用提供的 BlackHole 2ch，并允许麦克风访问。录制页可分别选择会议内声和麦克风。</li>
+</ul>
+<h4>开会时临时闭麦</h4>
+<p>需要和身边的人说话时，在助手里点「暂停外录」。会议内声和计时继续，麦克风轨在这段时间写入静音。回来后点「恢复外录」。Teams 等会议软件的静音控制的是通话，助手里的外录开关控制写入本地录音的声音。</p>
+<h4>结束录制</h4>
+<p>点录音按钮结束。程序会整理双轨、混合音频，再依次上传、转写和生成纪要。处理结束可点「打开纪要」。切换到其他页面时，录制控制条仍可返回录制页或暂停外录。</p></article>
+<article id="helpTopic4" tabindex="0" hidden><h3>已有文件导入</h3>
+<h4>使用已有的 Teams 录屏</h4>
+<p>在「导入生成」选择本机的 MP4、MOV 或 WAV、MP3、M4A、FLAC 等文件，按需添加参会人，选好档位后点「开始生成纪要」。云盘中的文件应先下载到本机。导入使用所选文件的声音，无需打开麦克风。</p></article>
+<article id="helpTopic5" tabindex="0" hidden><h3>纪要档位与处理进度</h3>
+<p>现场录制和文件导入都可以选择纪要档位，并在提交后查看进度。</p>
+<h4>选择纪要详细程度</h4>
+<ul>
+<li>简要适合快速查看会议结论和行动项。</li>
+<li>标准补充议题背景、主要观点和讨论结论。</li>
+<li>详细保留更多讨论过程、关键数据、分歧和决策依据。纪要模型设为默认的 qwen-flash 时，详细档使用 qwen-plus。</li>
+</ul>
+<h4>查看处理进度</h4>
+<p>展开「运行日志」，看最后一条停在准备、上传、云端转写还是生成纪要。上传耗时与文件大小和上行网速有关，转写还取决于实际音频时长。同样大小的视频可能有不同的处理时间。</p></article>
+<article id="helpTopic6" tabindex="0" hidden><h3>编辑标题、正文与表格</h3>
+<h4>修改标题与正文</h4>
+<p>在「纪要编辑」中点会议标题即可改名。正文可直接输入，修改会自动保存。等待「已保存到本机」提示，或按 Ctrl+S（macOS 用 ⌘S）立即保存。格式菜单可选正文、一级至六级标题和引用。</p>
+<h4>粘贴或粘贴为纯文本</h4>
+<p>在插入位置右键。要覆盖一段文字，先选中它，再在选区内右键。</p>
+<ul>
+<li>「粘贴」保留剪贴板里的标题、粗体、斜体、列表、链接和表格等纪要格式。Windows 按 Ctrl+V、macOS 按 ⌘V 也可粘贴。</li>
+<li>「粘贴为纯文本」只取文字和换行，沿用光标处的样式。粘错时，点工具栏的「撤销」。</li>
+</ul>
+<h4>调整表格与编辑空间</h4>
+<p>点工具栏的表格图标插入表格，再点一个单元格。「+行」「−行」「+列」「−列」作用于当前单元格所在的行或列。点「专注模式」可收起侧栏，按 Esc 返回。「校对」按钮可单独收起或展开右侧面板。</p></article>
+<article id="helpTopic7" tabindex="0" hidden><h3>术语校对与个人术语库</h3>
+<h4>确认原词或全文替换</h4>
+<p>打开右侧「校对」，点一个术语查看上下文和出现次数。反复点「定位正文」可逐处查看。用词正确时点「确认无误」。需要改写时，输入准确名称，点「全文替换」，核对替换次数后确认。替换范围是本场纪要正文，原始转写仍可在「原文」核对。</p>
+<h4>补上 AI 漏掉的术语</h4>
+<p>例如纪要里三次写成 AFC，正确名称是 AFRC。在校对栏输入正文里现有的 AFC 并点「添加」，它就会成为新的待办。定位核对后输入 AFRC，确认替换三处。查找时请保持与正文一致的大小写。</p>
+<h4>复查决定或复用准确写法</h4>
+<p>打开「已完成」可重新确认术语。刚完成的替换可点「撤回替换」，正文此后有改动时按提示检查对应段落。替换时勾选「记入我的术语库」，以后生成相关会议的纪要时会参考准确名称。左栏「个人术语库」也可手动添加或删除词条。</p></article>
+<article id="helpTopic8" tabindex="0" hidden><h3>匹配参会人与试听原文</h3>
+<h4>给本场说话人配上姓名</h4>
+<p>在编辑器的右侧「参会人」页签，点某位说话人旁的播放按钮，听一段发言。选中对应姓名，或选择「输入其他姓名」。匹配结果自动保存在本场会议，转写和纪要中相应的说话人标签会更新。</p>
+<h4>对照原话</h4>
+<p>在「原文」页签按时间戳查看发言，点击播放可试听该段。每场会议的说话人编号独立，下一场会议需要重新匹配。试听需要可用的本地会议音频和时间戳，清理音频后仍可查看转写文字。</p></article>
+<article id="helpTopic9" tabindex="0" hidden><h3>重新生成、保存与导出</h3>
+<h4>已经生成，还想换档位</h4>
+<p>点标题旁的纪要档位，选择简要、标准或详细，再点重新生成并确认。程序复用当前会议已有的完整转写，生成新稿并重新校对。旧稿会备份在该会议目录的「纪要历史版本」中，可打开对照手动编辑过的内容。</p>
+<h4>导出一份可分享的纪要</h4>
+<p>右侧校对任务全部处理后，点「导出纪要」，选择目标文件夹。导出的是 Markdown 文件，可以在支持 Markdown 表格的编辑器中预览。日常编辑已自动保存，导出用于另存一份。导出按钮仍为灰色时，查看「校对」里还有几项待确认。</p></article>
+<article id="helpTopic10" tabindex="0" hidden><h3>管理文件与释放空间</h3>
+<h4>找到会议资料</h4>
+<p>编辑某场会议时，点「更多（…）→ 打开本场会议文件夹」或右上角的文件夹图标，都会进入这场会议的文件夹。会议纪要.md 是当前稿，transcript.md 是完整转写。录制会议还会保存系统内声、麦克风和混合音频。录制或导入期间也可用右上角图标打开当前任务的文件夹。要查看所有会议，回到工作台再点该图标。</p>
+<h4>清理录音</h4>
+<p>在「更多（…）→ 清理音频」选择范围，查看文件数和预计释放空间后再确认。</p>
+<ul>
+<li>当前会议仅清理原始双轨，删除 track_system.wav 和 track_mic.wav，保留 audio.wav，适合仍需试听的会议。</li>
+<li>当前会议全部音频，同时清理该会议的混合音频。纪要和转写仍可查看。</li>
+<li>全部历史会议音频，清理当前输出目录内所有会议的程序音频。先核对预览中的场次和总大小。</li>
+</ul>
+<h4>移除整场会议</h4>
+<p>在编辑页左侧历史列表中点会议旁的删除按钮，核对会议名和路径后再确认。这个操作会移除列表记录，并永久删除整个会议文件夹，包括纪要、转写、音频和里面自行放入的文件。只想腾出录音空间时请选择「清理音频」。</p></article>
+<article id="helpTopic11" tabindex="0" hidden><h3>常见问题</h3>
+<h4>听得到对方，录不到自己</h4>
+<p>先看「麦克风」是否处于「已暂停」，再确认系统默认输入。Windows 可在开始录制前用「测试麦克风」检查设备，macOS 可在「系统设置 → 隐私与安全性 → 麦克风」检查权限。</p>
+<h4>上传失败或长时间没有进展</h4>
+<p>展开运行日志，区分上传文件与云端转写。检查所选文件是否能在本机播放，并根据具体错误检查网络、API Key 或公司网关。录制后的混合音频还在时，可在「导入生成」选择本场的 audio.wav 重新处理。</p>
+<h4>找不到之前的会议</h4>
+<p>在「偏好设置 → 设置」核对输出目录，再清空搜索框并把筛选切回「全部」。列表显示当前目录中已有纪要的会议。只有录音、还没有生成纪要的场次，可从文件夹取出音频再导入。</p></article>
+<p id="guideNoResults" role="status" hidden>没有匹配的主题，请换一个关键词。</p></div></div>
     </section>
   </div>
 
   <div class="overlay hidden" id="changelogOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
-    <section class="modal content-modal">
-      <div class="modal-head"><div><span class="eyebrow simple">RELEASE NOTES</span><h2 id="changelogTitle">更新日志</h2><p>会议纪要助手 v0.2.4</p></div><button class="modal-close" data-close="changelogOverlay" type="button">×</button></div>
-      <div class="release-hero"><span>0.2.4</span><div><strong>标题编辑与手动术语校对</strong><small>2026-11-11</small></div></div>
-      <div class="release-list">
-        <article><span>NEW</span><div><h3>会议标题编辑</h3><p>直接点击标题修改，自动保存并同步首页、历史列表和正文标题。</p></div></article>
-        <article><span>NEW</span><div><h3>手动添加漏检术语</h3><p>在校对栏输入术语，查看出现次数，逐处定位、确认或全文替换，支持撤回并保存处理进度。</p></div></article>
-        <article><span>FIXED</span><div><h3>录音转写依赖</h3><p>修复 Windows 录制完成后转写提示缺少 dashscope 模块的问题。</p></div></article>
-        <article><span>FIXED</span><div><h3>输出目录入口</h3><p>“更多 → 打开文件夹”打开已配置的输出目录；偏好设置中的相关入口统一命名为“设置”。</p></div></article>
-        <article><span>NEW</span><div><h3>Windows 安装向导</h3><p>支持选择安装位置、创建快捷方式和系统卸载入口；升级及卸载保留用户配置与会议资料。</p></div></article>
-        <article><span>NEW</span><div><h3>接续上次工作的首页</h3><p>最近会议支持待校对筛选与名称搜索，继续编辑入口保留上次打开的会议。</p></div></article>
-        <article><span>NEW</span><div><h3>侧栏试听与参会人匹配</h3><p>按转写时间戳试听真实录音，在侧栏确认姓名并自动保存；原文支持分段查看和播放。</p></div></article>
-        <article><span>NEW</span><div><h3>个人术语库与阅读偏好</h3><p>保存准确名称供后续生成参考，调整正文阅读字号、减少动态效果。专注模式可按 Esc 返回。</p></div></article>
-        <article><span>NEW</span><div><h3>生成后自动校对</h3><p>校对常见错别字和语病，不确定的术语与英文缩写交由人工确认。</p></div></article>
-        <article><span>NEW</span><div><h3>术语确认任务</h3><p>支持确认无误、全文替换和原地撤销，处理状态随纪要保存；完成全部任务后即可导出。</p></div></article>
-        <article><span>IMPROVED</span><div><h3>更宽敞的正文编辑区</h3><p>会议目录与顶部工具区更加紧凑，校对任务采用独立滚动卡片。</p></div></article>
-        <article><span>NEW</span><div><h3>三种音频清理范围</h3><p>可仅删除当前会议原始双轨并保留混合音频，也可删除当前会议或全部历史会议的所有程序音频。</p></div></article>
-        <article><span>SAFE</span><div><h3>文字资料始终保留</h3><p>清理只识别程序生成的三个固定音频文件，不会删除纪要、完整转写、JSON、会议文件夹或用户自行添加的文件。</p></div></article>
-        <article><span>IMPROVED</span><div><h3>清理前统计空间</h3><p>选择范围前显示涉及场次、文件数量和预计释放空间；录音或处理进行中自动禁止清理。</p></div></article>
-        <article><span>NEW</span><div><h3>会议内声不断，旁聊不入稿</h3><p>录制中可独立暂停或恢复麦克风外录；暂停区间写入等长静音，既隔离身边对话，也保持双轨时间轴准确。</p></div></article>
-        <article><span>NEW</span><div><h3>简要、标准、详细三档纪要</h3><p>录制和导入前即可选择；标准档保留背景与主要观点，详细档补充讨论脉络、分歧和决策依据。</p></div></article>
-        <article><span>NEW</span><div><h3>会后切档重新生成</h3><p>直接使用已保存的完整转写重新生成，不重复上传音频；覆盖前会把当前纪要备份到本场会议目录。</p></div></article>
-        <article><span>IMPROVED</span><div><h3>可视化参会人配置</h3><p>本场参会人和常用名册统一使用头像标签增删；说话人匹配时可结合发言样例一键选择候选姓名。</p></div></article>
-        <article><span>NEW</span><div><h3>会后匹配参会人</h3><p>纪要编辑页可根据样例发言确认说话人 1、2…的姓名，保存后同步更新完整转写和纪要中的说话人标签。</p></div></article>
-        <article><span>FIXED</span><div><h3>恢复明确的系统默认麦克风</h3><p>麦克风列表分为“自动选择”和“固定设备”，系统默认项始终置顶，并明确说明会跟随 Windows 及耳机插拔自动切换。</p></div></article>
-        <article><span>FIXED</span><div><h3>增强麦克风实时耳返</h3><p>测试改用稳定的阻塞读取链路，优先回放到 Windows 当前默认输出，并增加适度增益与实时音量条。</p></div></article>
-        <article><span>NEW</span><div><h3>实时测试当前麦克风</h3><p>说话声会低延迟回放到当前默认耳机或扬声器，并明确显示测试使用的输入与播放设备。</p></div></article>
-        <article><span>FIXED</span><div><h3>正确打开自定义输出目录</h3><p>Windows 资源管理器会直接进入设置中保存的目录，不再错误停留在 Documents 父级。</p></div></article>
-        <article><span>FIXED</span><div><h3>恢复默认麦克风人声</h3><p>直接跟随 Windows WASAPI 默认输入，并按麦克风原生声道格式录制，避免误用旧端点导致静音。</p></div></article>
-        <article><span>IMPROVED</span><div><h3>精简麦克风列表</h3><p>只显示真实的 WASAPI 输入设备，移除 Sound Mapper、DirectSound、输出回环和同名重复项。</p></div></article>
-        <article><span>FIXED</span><div><h3>修复结束录音时闪退</h3><p>改用 PyAudio 回调采集，并按“停止音频流 → 排空写盘队列 → 关闭 WAV”的顺序安全收尾。</p></div></article>
-        <article><span>FIXED</span><div><h3>修复 WASAPI 回环流启动</h3><p>按 PyAudioWPatch 的真实接口直接打开默认输出设备对应的回环输入，移除不受支持的 as_loopback 参数。</p></div></article>
-        <article><span>FIXED</span><div><h3>使用 Windows 系统证书库</h3><p>百炼请求改由 CryptoAPI 校验证书，兼容公司统一下发的根证书和中间证书，无需关闭 HTTPS 安全校验。</p></div></article>
-        <article><span>NEW</span><div><h3>完整会议处理闭环</h3><p>支持会议内声与麦克风双轨录制、已有音视频导入、说话人分离、自动转写与结构化纪要。</p></div></article>
-        <article><span>NEW</span><div><h3>可视化纪要编辑器</h3><p>集中管理历史会议，在应用内校对、排版、保存与导出 Markdown 纪要。</p></div></article>
-        <article><span>IMPROVED</span><div><h3>编辑器与历史记录</h3><p>支持长文滚动、完整标题层级、表格行列调整，以及带确认提示的完整会议删除。</p></div></article>
-      </div>
-      <div class="modal-foot"><button class="button primary" data-close="changelogOverlay" type="button">继续使用</button></div>
+    <section class="modal help-modal">
+      <header class="modal-head"><div><h2 id="changelogTitle">更新日志</h2><p>所有时间均为北京时间（UTC+8）。展开版本可查看详细改动。</p></div>
+        <button class="modal-close" data-close="changelogOverlay" type="button" aria-label="关闭更新日志">×</button></header>
+      <div class="release-timeline">
+<details class="release-entry" open>
+<summary><b>v0.3.0</b><strong>工作台与编辑界面优化</strong><span>发布 <time datetime="2026-11-18T11:00:00+08:00">2026-11-18 11:00</time></span></summary>
+<div><ul>
+<li>工作台界面优化。首页可继续上次编辑、直接定位待校对术语，并按名称或校对状态筛选会议。</li>
+<li>四个页面使用左侧导航。个人术语库、使用说明、更新日志和偏好设置位于左栏下方。</li>
+<li>纪要正文右键可选「粘贴」或「粘贴为纯文本」。普通粘贴与 Ctrl+V、⌘V 保留支持的格式，纯文本粘贴沿用光标处样式。校对术语支持正文高亮和逐项展开。</li>
+<li>使用说明并列展示现场录制和已有文件导入两种场景，支持按主题查阅和关键词搜索。更新日志按版本展示历史发布时间。</li>
+<li>编辑纪要时，右上角和「更多」菜单中的文件夹按钮均打开所选会议的文件夹。工作台保留打开总输出目录的入口。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.2.4</b><strong>标题编辑与手动术语校对</strong><span>发布 <time datetime="2026-11-11T19:33:00+08:00">2026-11-11 19:33</time></span></summary>
+<div><ul>
+<li>会议标题支持直接修改并自动保存，同步更新首页、历史列表及正文标题。</li>
+<li>校对栏支持手动添加漏检术语，显示出现次数，复用逐处定位、确认、全文替换与撤回；任务保存后可继续处理，未确认时禁止导出。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.2.3</b><strong>Windows 转写依赖修复</strong><span>发布 <time datetime="2026-11-11T18:05:00+08:00">2026-11-11 18:05</time></span></summary>
+<div><ul>
+<li>修复 Windows 录制结束后转写时出现 <code>No module named &#x27;dashscope&#x27;</code> 的问题，适配并完整打包百炼 SDK 2.0.4。</li>
+<li>保留已有 API Key、网关和输出目录；上传、提交及轮询均使用当前配置的网关。</li>
+<li>Windows 便携程序、安装后的程序和 macOS 应用增加离线转写 SDK 加载检查，失败时阻止发布产物。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.2.2</b><strong>输出目录与设置入口</strong><span>发布 <time datetime="2026-11-10T10:15:00+08:00">2026-11-10 10:15</time></span></summary>
+<div><ul>
+<li>纪要编辑页“更多 → 打开文件夹”打开设置中保存的输出目录，与顶部文件夹入口一致；打开失败时显示错误信息。</li>
+<li>偏好设置中“模型、设备与输出目录”的入口统一命名为“设置”。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.2.1</b><strong>Windows 安装向导</strong><span>发布 <time datetime="2026-11-10T09:26:00+08:00">2026-11-10 09:26</time></span></summary>
+<div><ul>
+<li>Windows 提供 Setup 安装向导，支持安装位置、开始菜单、可选桌面快捷方式与系统卸载入口。</li>
+<li>按当前用户安装，覆盖升级复用安装位置；卸载保留用户配置、API Key 和会议资料。</li>
+<li>保留便携 EXE；构建增加安装、覆盖升级及卸载自动验证。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.2.0</b><strong>纪要工作区与分段试听</strong><span>发布 <time datetime="2026-11-09T23:32:00+08:00">2026-11-09 23:32</time></span></summary>
+<div><ul>
+<li>工作台支持继续上次编辑、待校对会议计数、全部／待校对筛选及会议名称搜索。</li>
+<li>会议列表采用紧凑双行布局，时间和校对状态并排展示。</li>
+<li>校对侧栏显示任务进度、出现次数、上下文及逐处定位；支持确认无误、全文替换与撤回。</li>
+<li>个人术语库支持添加、删除和本机持久保存，生成纪要时参考相关的准确名称。</li>
+<li>参会人在侧栏匹配，可试听样例发言；原文按时间戳分段展示并支持片段试听。</li>
+<li>录音清理后保留文字查看，试听入口明确提示音频不可用。</li>
+<li>偏好设置支持正文阅读字号和减少动态效果，保留模型、设备及输出目录配置。</li>
+<li>专注模式扩大正文工作区，支持 Esc 退出；工具栏采用专注、校对计数、更多和导出入口。</li>
+<li>编辑内容与术语决定自动保存，导出前检查全部校对任务。</li>
+<li>录制控制台使用实际音量驱动双路动态包络，并保留跨页面录制控制条。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.10</b><strong>生成后校对与导出检查</strong><span>发布 <time datetime="2026-11-09T12:24:00+08:00">2026-11-09 12:24</time></span></summary>
+<div><h4>新增</h4>
+<ul>
+<li>生成和重新生成纪要后自动校对常见错别字、语病；不确定术语及英文缩写保留原文，列入右侧校对任务。</li>
+<li>每项支持确认无误或全文替换，替换后可原地撤销；任务区显示完成数与待处理数。</li>
+<li>校对任务状态随纪要保存，全部任务完成并保存后方可导出，前后端均检查待处理项。</li>
+</ul>
+<h4>改进</h4>
+<ul>
+<li>收窄会议目录并压缩标题、详细程度与工具区，扩大正文编辑空间。</li>
+<li>校对栏统一采用紧凑卡片与现有控件样式，完成任务以绿色区分。</li>
+<li>校对服务异常时保留生成的纪要并提示人工检查。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.9</b><strong>录音空间清理</strong><span>发布 <time datetime="2026-09-15T12:46:00+08:00">2026-09-15 12:46</time></span></summary>
+<div><h4>新增</h4>
+<ul>
+<li>纪要编辑页新增“清理音频”存储管理，可选择删除当前会议原始双轨并保留混合音频、删除当前会议全部音频，或清理全部历史会议音频。</li>
+<li>清理前显示涉及场次、文件数量和预计释放空间，并再次确认不可撤销影响。</li>
+</ul>
+<h4>改进</h4>
+<ul>
+<li>Windows 麦克风自动模式明确标为“电脑默认外录”，并显示当前默认设备；未插耳机时通常使用电脑内置麦克风，插入耳机后跟随 Windows 默认耳机麦克风。</li>
+<li>仍保留所有真实麦克风的固定选择；固定设备拔出时，界面会提示切回“电脑默认外录”。</li>
+</ul>
+<h4>安全</h4>
+<ul>
+<li>音频清理仅识别程序生成的 <code>track_system.wav</code>、<code>track_mic.wav</code> 和 <code>audio.wav</code>，不会删除纪要、完整转写、JSON、会议文件夹或用户自行添加的其他文件。</li>
+<li>只有混合音频存在时才允许删除当前会议原始双轨；录音或处理进行中禁止清理。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.8</b><strong>录制中暂停麦克风</strong><span>发布 <time datetime="2026-09-05T10:54:00+08:00">2026-09-05 10:54</time></span></summary>
+<div><h4>新增</h4>
+<ul>
+<li>会议录制过程中可随时暂停或恢复麦克风外录，会议内声与总录制计时不受影响。</li>
+<li>录制控制台、处理状态和运行日志会同步显示外录当前状态，避免误以为整场录制已暂停。</li>
+</ul>
+<h4>改进</h4>
+<ul>
+<li>暂停外录时不关闭音频设备或丢弃时间片，而是向麦克风轨写入等长静音，防止恢复后与系统内声发生时间轴错位。</li>
+<li>每次开始新会议时外录默认恢复为开启状态；音频设备启动期间的开关操作也会在设备就绪后正确应用。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.7</b><strong>纪要档位与会后重新生成</strong><span>发布 <time datetime="2026-09-05T07:34:00+08:00">2026-09-05 07:34</time></span></summary>
+<div><h4>新增</h4>
+<ul>
+<li>录制会议和导入音视频时可选择“简要、标准、详细”三档纪要。</li>
+<li>标准档补充议题背景、主要观点和讨论结论；详细档进一步保留讨论脉络、关键数据、分歧和决策依据。</li>
+<li>详细档在默认 <code>qwen-flash</code> 配置下自动升级为 <code>qwen-plus</code>；用户手动选择的其他模型保持不变。</li>
+<li>纪要编辑页可直接切换档位并基于已有完整转写重新生成，不重复上传音频或执行转写。</li>
+<li>重新生成前自动将当前纪要备份到本场会议的 <code>纪要历史版本</code> 文件夹。</li>
+<li>参会人输入改为可增删的头像标签，支持粘贴多行，并可在设置中维护常用参会人。</li>
+<li>说话人匹配界面直接展示常用参会人候选按钮，结合样例发言完成可视化匹配。</li>
+</ul>
+<h4>改进</h4>
+<ul>
+<li>为每场会议增加 <code>session.json</code>，持久化会议标题、参会人、纪要详细程度和实际生成模型；旧会话自动按简要档兼容。</li>
+<li>管线进度会同步更新界面阶段，避免处理期间长时间停留在“正在准备音频”。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.6</b><strong>说话人姓名匹配</strong><span>发布 <time datetime="2026-08-31T10:33:00+08:00">2026-08-31 10:33</time></span></summary>
+<div><h4>新增</h4>
+<ul>
+<li>纪要编辑页新增“匹配参会人”：根据每位说话人的样例发言，后期填写或选择真实姓名。</li>
+<li>每场会议的匹配结果独立保存为 <code>speaker_map.json</code>；保存后从原始 <code>transcript.json</code> 重新生成带姓名的完整转写。</li>
+<li>将纪要正文里仍存在的“说话人N”标签替换为确认姓名，同时保留用户的其他人工编辑。</li>
+<li>Windows 麦克风测试增加实时输入音量条。</li>
+</ul>
+<h4>修复</h4>
+<ul>
+<li>麦克风列表明确分为“自动选择”和“固定设备”，始终显示置顶的系统默认项，并保留当前默认物理设备供固定选择。</li>
+<li>系统默认项会继续跟随 Windows 默认输入及耳机插拔自动切换，不再因隐藏同名物理项造成误解。</li>
+<li>麦克风测试改用独立的阻塞读取/播放链路，优先使用 Windows 当前全局默认输出，并增加适度回放增益，修复测试启动但听不到耳返的问题。</li>
+<li>测试链路与正式会议录制继续隔离，不改动已经稳定工作的双轨录制实现。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.5</b><strong>麦克风测试与输出目录</strong><span>发布 <time datetime="2026-08-31T07:09:00+08:00">2026-08-31 07:09</time></span></summary>
+<div><h4>新增</h4>
+<ul>
+<li>Windows 录制页新增麦克风实时测试：将当前选中麦克风低延迟回放到 Windows 当前默认耳机或扬声器。</li>
+<li>测试状态明确显示实际输入与实际播放设备；离开页面、开始录音或退出应用时自动释放测试流。</li>
+</ul>
+<h4>修复</h4>
+<ul>
+<li>“跟随 Windows 默认”现在显示当前真实麦克风名称，并隐藏未被固定选择的同名默认物理项，避免看起来多出一个重复设备。</li>
+<li>修复 Windows“打开输出目录”错误使用 Explorer <code>/select</code> 参数，导致只打开自定义目录的父级（常见为 Documents）。</li>
+<li>打开目录失败时不再静默忽略，界面会显示可操作的错误信息。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.4</b><strong>Windows 麦克风选择</strong><span>发布 <time datetime="2026-08-30T23:22:00+08:00">2026-08-30 23:22</time></span></summary>
+<div><h4>修复</h4>
+<ul>
+<li>修复 Windows 选择“系统默认麦克风”时可能误用旧的 Sound Mapper 端点，导致录音无人声。</li>
+<li>麦克风列表只保留真实的 WASAPI 输入设备，排除 MME、DirectSound、输出回环与同名重复项。</li>
+<li>默认麦克风直接跟随 Windows WASAPI 默认输入端点。</li>
+<li>按麦克风支持的原生声道数打开录音流，再降混为转写所需的单声道，兼容双声道麦克风阵列。</li>
+<li>当旧配置指向已拔出设备或 Windows 未设置默认输入时，给出明确的操作提示。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.3</b><strong>录制结束的稳定性</strong><span>发布 <time datetime="2026-08-30T22:10:00+08:00">2026-08-30 22:10</time></span></summary>
+<div><h4>修复</h4>
+<ul>
+<li>修复 Windows 结束会议录音后程序可能直接退出的问题。</li>
+<li>将 WASAPI 回环与麦克风从阻塞式 <code>stream.read()</code> 读线程改为 PyAudio 回调采集，避免关闭流时与原生读取并发。</li>
+<li>结束时先停止并关闭全部原生音频流，再排空写盘队列、封口 WAV 文件并释放 PyAudio。</li>
+<li>补充回调录音、双声道降混与资源关闭顺序的回归测试。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.2</b><strong>Windows 内录启动修复</strong><span>发布 <time datetime="2026-08-30T20:41:00+08:00">2026-08-30 20:41</time></span></summary>
+<div><h4>修复</h4>
+<ul>
+<li>修复 Windows 会议录制启动时报 <code>Stream.__init__() got an unexpected keyword argument &#x27;as_loopback&#x27;</code>。</li>
+<li>按 PyAudioWPatch 的正式接口直接打开默认输出设备对应的 WASAPI 回环输入，不再传入其他音频库的参数。</li>
+<li>将 Windows 录音测试替身改为显式的 PyAudio 参数签名，防止未知关键字参数再次绕过测试。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.1</b><strong>公司网络与 Windows 内录</strong><span>发布 <time datetime="2026-08-30T18:17:00+08:00">2026-08-30 18:17</time></span></summary>
+<div><h4>修复</h4>
+<ul>
+<li>Windows 版改用系统 CryptoAPI 信任证书库，兼容公司统一下发的根证书与中间证书。</li>
+<li>Windows 录制页明确显示“默认输出设备（WASAPI 自动内录）”；检测不到回环设备时在录制前直接提示，不再静默退化为仅麦克风。</li>
+<li>保持严格 HTTPS 校验，不通过关闭证书验证绕过连接问题。</li>
+<li>为上传、转写、结果下载和纪要生成补充可操作的证书错误提示。</li>
+<li>Windows 与 macOS 构建在打包前执行完整测试；Windows 打包显式收集系统证书后端。</li>
+</ul></div></details>
+<details class="release-entry">
+<summary><b>v0.1.0</b><strong>首次发布</strong><span>发布 <time datetime="2026-08-30T11:15:00+08:00">2026-08-30 11:15</time></span></summary>
+<div><p>首个可用版本。</p>
+<h4>新增</h4>
+<ul>
+<li>支持 macOS 和 Windows 的会议内声、麦克风双轨录制。</li>
+<li>支持导入常见音频和视频文件生成会议纪要。</li>
+<li>接入百炼 fun-asr，自动转写并区分说话人。</li>
+<li>接入 qwen-flash，生成摘要、关键决策和行动事项。</li>
+<li>提供历史会议列表、所见即所得纪要编辑、Markdown 保存与导出。</li>
+<li>提供 Weekflow 风格的会议工作台、处理进度和运行日志。</li>
+<li>在应用首页提供使用说明和版本更新日志。</li>
+</ul>
+<h4>隐私与存储</h4>
+<ul>
+<li>音频、转写与会议纪要默认保存在用户指定的本机输出目录。</li>
+<li>API Key 仅保存在本机配置文件中。</li>
+<li>转写时音频会临时上传到用户配置的百炼服务端点。</li>
+</ul>
+<h4>体验修复 — 2026-08-30</h4>
+<ul>
+<li>修复长篇纪要和历史会议列表无法独立滚动的问题。</li>
+<li>补全 Markdown 一级至六级标题选项。</li>
+<li>支持在编辑器中增加或删除表格行列。</li>
+<li>修复表格保存后因行间空行而无法被 Markdown 预览器识别的问题。</li>
+<li>支持从历史记录永久删除完整会议文件夹，并在删除前明确提示影响范围。</li>
+<li>缩小录音控制台，将处理状态与步骤移动到录音控制台上方。</li>
+<li>导入生成页同步采用上方状态面板与紧凑处理说明卡，保持与录制页一致。</li>
+<li>统一会议录制与导入生成页的双栏宽度、间距和顶部基线，消除页面切换时的横向跳动。</li>
+</ul></div></details>
+</div>
     </section>
   </div>
+  <!-- END offline help -->
 
   <div class="overlay hidden" id="setupOverlay" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
     <section class="modal setup-modal">
@@ -459,6 +682,13 @@
     </section>
   </div>
 
+  <div id="editorContextMenu" class="editor-menu" role="menu" aria-label="正文编辑" hidden>
+    <button role="menuitem" type="button" data-edit="cut">剪切</button>
+    <button role="menuitem" type="button" data-edit="copy">复制</button>
+    <button role="menuitem" type="button" data-edit="paste">粘贴</button>
+    <button role="menuitem" type="button" data-edit="pastePlain">粘贴为纯文本</button>
+    <button role="menuitem" type="button" data-edit="selectAll">全选正文</button>
+  </div>
   <div class="toast hidden" id="toast" role="status"></div>
   <script src="app.js"></script>
   <script src="workspace.js"></script>

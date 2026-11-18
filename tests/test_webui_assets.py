@@ -21,7 +21,7 @@ def test_home_contains_guide_changelog_and_version():
 
     assert 'id="guideOverlay"' in html
     assert 'id="changelogOverlay"' in html
-    assert "v0.2.4" in html
+    assert "v0.3.0" in html
     assert 'data-view-panel="minutes"' in html
 
 
@@ -177,12 +177,12 @@ def test_release_builds_embed_version_metadata():
     assert '--version-file assets\\version_info.txt' in workflow
     assert '--version-file assets\\version_info.txt' in windows_script
     for content in (workflow, macos_script):
-        assert "Set :CFBundleShortVersionString 0.2.4" in content
-        assert "Set :CFBundleVersion 0.2.4" in content
-    assert "filevers=(0, 2, 4, 0)" in windows_version
-    assert "prodvers=(0, 2, 4, 0)" in windows_version
-    assert "StringStruct('FileVersion', '0.2.4')" in windows_version
-    assert "StringStruct('ProductVersion', '0.2.4')" in windows_version
+        assert "Set :CFBundleShortVersionString 0.3.0" in content
+        assert "Set :CFBundleVersion 0.3.0" in content
+    assert "filevers=(0, 3, 0, 0)" in windows_version
+    assert "prodvers=(0, 3, 0, 0)" in windows_version
+    assert "StringStruct('FileVersion', '0.3.0')" in windows_version
+    assert "StringStruct('ProductVersion', '0.3.0')" in windows_version
 
 
 def test_windows_release_uses_native_certificate_store():
@@ -206,3 +206,10 @@ def test_release_metadata_uses_github_identity_not_conversational_name():
     assert "[@whisper2upp-max]" in readme
     for content in (windows_version, readme, javascript):
         assert "Wesley Yan" not in content
+
+
+def test_offline_help_matches_versioned_manual_and_changelog():
+    import subprocess
+    import sys
+
+    subprocess.run([sys.executable, str(ROOT / "scripts/render_help.py"), "--check"], check=True)

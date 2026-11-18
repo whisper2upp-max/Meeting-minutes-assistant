@@ -203,9 +203,17 @@ function setActiveView(name, force = false) {
   }
   if (state.activeView === "record" && name !== "record") void stopMicTest(true);
   state.activeView = name;
+  updateFolderButton();
   document.body.classList.toggle("minutes-mode", name === "minutes");
   qa("[data-view-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === name));
-  qa(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === name));
+  qa(".nav-item").forEach((item) => {
+    const current = item.dataset.view === name;
+    item.classList.toggle("active", current);
+    if (current) {
+      item.setAttribute("aria-current", "page");
+      $("currentViewName").textContent = item.textContent;
+    } else item.removeAttribute("aria-current");
+  });
 
   const progress = $("progressPanel");
   if (name === "record") {
@@ -443,6 +451,7 @@ async function pollStatus() {
   try {
     const status = await api().get_status();
     state.status = status;
+    updateFolderButton();
     renderHeaderStatus(status);
     renderRecorder(status);
     renderProgress(status);
@@ -606,6 +615,7 @@ function escapeHtml(value) {
 function inlineMarkdown(value) {
   return escapeHtml(value)
     .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
     .replace(/\[([^\]]+)]\(([^)]+)\)/g, '<a href="$2">$1</a>');
@@ -689,34 +699,39 @@ function markdownToHtml(markdown) {
   return output.join("\n");
 }
 
+function inlineNodeToMarkdown(node) {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+  if (node.nodeType !== Node.ELEMENT_NODE) return "";
+  const inside = inlineToMarkdown(node);
+  switch (node.tagName) {
+    case "B": case "STRONG": return `**${inside}**`;
+    case "I": case "EM": return `*${inside}*`;
+    case "CODE": return "`" + node.textContent + "`";
+    case "A": return `[${inside}](${node.getAttribute("href") || ""})`;
+    case "BR": return "  \n";
+    default: return inside;
+  }
+}
+
 function inlineToMarkdown(node) {
-  let result = "";
-  node.childNodes.forEach((child) => {
-    if (child.nodeType === Node.TEXT_NODE) {
-      result += child.textContent;
-      return;
-    }
-    const tag = child.nodeName;
-    const inside = inlineToMarkdown(child);
-    if (["B", "STRONG"].includes(tag)) result += `**${inside}**`;
-    else if (["I", "EM"].includes(tag)) result += `*${inside}*`;
-    else if (tag === "CODE") result += `\`${child.textContent}\``;
-    else if (tag === "A") result += `[${inside}](${child.getAttribute("href") || ""})`;
-    else if (tag === "BR") result += "  \n";
-    else result += inside;
-  });
-  return result;
+  return Array.from(node.childNodes, inlineNodeToMarkdown).join("");
 }
 
 function editorToMarkdown(root) {
   const blocks = [];
+  // Pasting into a blank editor can put text and inline elements directly at its root.
+  let inline = "";
+  function flushInline() {
+    if (inline.trim()) blocks.push(inline.trim());
+    inline = "";
+  }
   root.childNodes.forEach((node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent.trim();
-      if (text) blocks.push(text);
+    const tag = node.nodeName;
+    if (!(node.nodeType === Node.ELEMENT_NODE && node.matches("p,div,h1,h2,h3,h4,h5,h6,blockquote,ul,ol,table"))) {
+      inline += inlineNodeToMarkdown(node);
       return;
     }
-    const tag = node.nodeName;
+    flushInline();
     if (/^H[1-6]$/.test(tag)) {
       blocks.push(`${"#".repeat(Number(tag.slice(1)))} ${inlineToMarkdown(node).trim()}`);
     } else if (["P", "DIV"].includes(tag)) {
@@ -740,6 +755,7 @@ function editorToMarkdown(root) {
       if (tableLines.length) blocks.push(tableLines.join("\n"));
     }
   });
+  flushInline();
   return `${blocks.join("\n\n").replace(/\n{3,}/g, "\n\n").trim()}\n`;
 }
 
@@ -822,6 +838,7 @@ function changeTable(action) {
 }
 
 function setEditorEnabled(enabled) {
+  updateFolderButton();
   $("minutesBody").contentEditable = enabled ? "true" : "false";
   $("documentTitle").readOnly = !enabled;
   qa("button, select", $("editorToolbar")).forEach((control) => { control.disabled = !enabled; });
@@ -1021,6 +1038,7 @@ async function openMinutes(path) {
   renderMinutesGeneration(state.status || {});
   renderSessionList();
   setActiveView("minutes", true);
+  return true;
 }
 
 function renderProofreading(review) {
@@ -1357,39 +1375,8 @@ function renderSessionList() {
   });
 }
 
-function renderRecent() {
-  $("metricMeetings").textContent = String(state.sessions.length);
-  $("sessionCount").textContent = `${state.sessions.length} 个纪要`;
-  const box = $("recentList");
-  box.replaceChildren();
-  if (!state.sessions.length) {
-    box.innerHTML = '<div class="empty-state"><span>还没有会议纪要</span><small>完成一次录制或导入后，会在这里出现。</small></div>';
-    return;
-  }
-  state.sessions.slice(0, 5).forEach((session) => {
-    const row = document.createElement("div");
-    row.className = "recent-row";
-    const date = document.createElement("span");
-    const copy = document.createElement("div");
-    const title = document.createElement("strong");
-    const meta = document.createElement("small");
-    const size = document.createElement("span");
-    const open = document.createElement("button");
-    date.className = "recent-date";
-    copy.className = "recent-copy";
-    size.className = "recent-size";
-    open.className = "recent-open";
-    date.textContent = (session.mtime || "-- --").split(" ")[0].replace("-", "/");
-    title.textContent = sessionTitle(session);
-    meta.textContent = `${session.mtime || "本机纪要"} · ${session.detail_label || "简要"}纪要`;
-    size.textContent = `${session.size_kb || 0} KB`;
-    open.textContent = "编辑纪要";
-    copy.append(title, meta);
-    open.addEventListener("click", () => openMinutes(session.minutes));
-    row.append(date, copy, size, open);
-    box.appendChild(row);
-  });
-}
+// The workspace script installs the meeting table before the desktop bridge is ready.
+let renderRecent = () => {};
 
 async function loadSessions() {
   if (!state.apiReady) return;
@@ -1436,13 +1423,29 @@ async function saveSettings() {
   await loadSessions();
 }
 
+function folderContext() {
+  if (state.activeView === "minutes" && state.activeMinutes) return "minutes";
+  if (state.activeView === "record" || state.activeView === "import") {
+    const status = state.status;
+    if (status?.session_dir || ["recording", "processing"].includes(status?.phase)) return "task";
+  }
+  return "root";
+}
+
+function updateFolderButton() {
+  const button = $("btnOutput");
+  button.title = folderContext() === "root" ? "打开所有会议的输出目录" : "打开本场会议文件夹";
+  button.setAttribute("aria-label", button.title);
+}
+
 async function openOutputFolder() {
   if (!state.apiReady) return;
   try {
-    const result = await api().open_output_dir();
-    if (!result.ok) toast(result.error || "无法打开输出目录");
+    const context = folderContext();
+    const result = await api().open_output_dir(context === "minutes" ? state.activeMinutes : "", context === "task");
+    if (!result.ok) toast(result.error || "无法打开文件夹");
   } catch (error) {
-    toast("无法打开输出目录：" + (error.message || String(error)));
+    toast("无法打开文件夹：" + (error.message || String(error)));
   }
 }
 
@@ -1486,7 +1489,6 @@ function bindEvents() {
   $("btnChangelog").addEventListener("click", () => openOverlay("changelogOverlay"));
   $("btnSettings").addEventListener("click", openSettings);
   $("btnOutput").addEventListener("click", openOutputFolder);
-  $("btnAllMinutes").addEventListener("click", () => setActiveView("minutes"));
   $("btnRefresh").addEventListener("click", async () => {
     await stopMicTest(true);
     await loadDevices();
@@ -1538,7 +1540,7 @@ function bindEvents() {
 
   $("sessionSearch").addEventListener("input", renderSessionList);
   $("btnRefreshSessions").addEventListener("click", loadSessions);
-  $("minutesBody").addEventListener("input", markDirty);
+  $("minutesBody").addEventListener("input", () => markDirty());
   $("minutesBody").addEventListener("click", updateTableControls);
   $("minutesBody").addEventListener("keyup", updateTableControls);
   $("btnSaveMinutes").addEventListener("click", saveMinutes);
@@ -1601,8 +1603,6 @@ async function initializeDesktop() {
   setAttendees("record", []);
   setAttendees("import", []);
   setAttendees("settings", state.attendeeSuggestions);
-  $("metricTranscribe").textContent = config.transcribe_model || "fun-asr";
-  $("metricMinutes").textContent = config.llm_model || "qwen-flash";
   window.setInterval(pollStatus, 650);
 }
 
