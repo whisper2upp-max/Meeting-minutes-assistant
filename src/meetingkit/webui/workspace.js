@@ -297,29 +297,71 @@
     const range = selection.getRangeAt(0);
     return editor.contains(range.commonAncestorContainer) ? range.cloneRange() : null;
   }
-  function insertPlainText(text, range) {
-    if (!text || !editor.isContentEditable) return;
-    editor.focus();
+  const pasteTags = new Set('P H1 H2 H3 H4 H5 H6 BR STRONG B EM I CODE BLOCKQUOTE UL OL LI TABLE THEAD TBODY TR TD TH A'.split(' '));
+  function cleanPasteHtml(source) {
+    const template = document.createElement('template');
+    template.innerHTML = source;
+    const output = document.createElement('div');
+    function append(node, parent) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        parent.append(node.textContent);
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE || node.namespaceURI !== 'http://www.w3.org/1999/xhtml' ||
+          node.matches('script,style,head,title,link,meta,base,template,iframe,object,embed,noscript,button,input,textarea,select,[hidden]')) return;
+
+      let tag = node.tagName;
+      // Google Docs can wrap the entire copied selection in a normal-weight B element.
+      if (['B', 'STRONG'].includes(tag) && ['normal', '400'].includes(node.style.fontWeight)) tag = 'SPAN';
+      // Keep paragraph boundaries while unwrapping layout containers copied from websites.
+      if (tag === 'DIV' && !node.querySelector('p,div,h1,h2,h3,h4,h5,h6,table,ul,ol,blockquote')) tag = 'P';
+      const href = node.getAttribute('href')?.trim();
+      if (tag === 'A' && !/^(https?:\/\/|mailto:)/i.test(href || '')) tag = '';
+      let target = parent;
+      if (pasteTags.has(tag)) {
+        target = document.createElement(tag.toLowerCase());
+        if (tag === 'A') target.setAttribute('href', href);
+        parent.append(target);
+      }
+      if (['SPAN', 'FONT', 'P', 'B', 'I', 'EM', 'STRONG', 'A'].includes(tag)) {
+        const weight = node.style.fontWeight;
+        if (tag !== 'B' && tag !== 'STRONG' && (weight === 'bold' || Number(weight) >= 600)) {
+          const bold = document.createElement('strong');
+          target.append(bold);
+          target = bold;
+        }
+        if (tag !== 'I' && tag !== 'EM' && node.style.fontStyle === 'italic') {
+          const italic = document.createElement('em');
+          target.append(italic);
+          target = italic;
+        }
+      }
+      for (const child of node.childNodes) append(child, target);
+    }
+    for (const node of template.content.childNodes) append(node, output);
+    return output.textContent.trim() ? output.innerHTML : '';
+  }
+  function insertClipboard({text, html}, range) {
+    if (!editor.isContentEditable) return;
+    const rich = html && cleanPasteHtml(html);
+    if (!rich && !text) return toast('剪贴板中没有可粘贴的文字');
     if (!range) {
       range = document.createRange();
       range.selectNodeContents(editor);
       range.collapse(false);
     }
     if (!editor.contains(range.commonAncestorContainer)) return;
-    const selection = getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
-    // Use the editing engine so pasted text inherits the insertion point's style and supports Undo.
-    if (!document.execCommand('insertText', false, text.replace(/\r\n?/g, '\n'))) {
+    restoreSelection(range);
+    // Native editing commands preserve the selection, undo history and autosave input event.
+    if (!document.execCommand(rich ? 'insertHTML' : 'insertText', false, rich || text.replace(/\r\n?/g, '\n'))) {
       toast('未能插入文字，请在正文中选定位置后再试。');
     }
   }
   editor.addEventListener('paste', event => {
     if (!editor.isContentEditable) return;
     event.preventDefault();
-    const text = event.clipboardData?.getData('text/plain');
-    if (text) insertPlainText(text, currentEditorRange());
-    else toast('剪贴板中没有可粘贴的文字');
+    const data = event.clipboardData;
+    insertClipboard({text: data?.getData('text/plain'), html: data?.getData('text/html')}, currentEditorRange());
   });
   const menu = $('editorContextMenu');
   const menuButtons = [...menu.querySelectorAll('button')];
@@ -393,22 +435,28 @@
       restoreSelection(range);
       return;
     }
-    if (command !== 'paste') {
+    if (command !== 'paste' && command !== 'pastePlain') {
       if (!document.execCommand(command)) toast(command === 'copy' ? '请使用系统复制快捷键' : '请使用系统剪切快捷键');
       return;
     }
     const path = state.activeMinutes, request = state.minutesRequest, editRevision = revision;
     try {
-      let text;
+      const formatted = command === 'paste';
+      let payload;
       if (state.apiReady) {
-        const result = await api().read_clipboard_text();
-        if (result.ok) text = result.text;
+        const result = await api().read_editor_clipboard(formatted);
+        if (result.ok) payload = result;
       }
-      if (text === undefined) text = await navigator.clipboard.readText();
+      if (!payload && formatted && navigator.clipboard?.read) {
+        const items = await navigator.clipboard.read();
+        const item = items.find(x => x.types.includes('text/html') || x.types.includes('text/plain'));
+        const readType = async type => item?.types.includes(type) ? (await item.getType(type)).text() : '';
+        payload = {text: await readType('text/plain'), html: await readType('text/html')};
+      }
+      if (!payload) payload = {text: await navigator.clipboard.readText()};
       if (state.activeView !== 'minutes' || path !== state.activeMinutes || request !== state.minutesRequest ||
           editRevision !== revision || !editor.contains(range.commonAncestorContainer)) return;
-      if (text) insertPlainText(text, range);
-      else toast('剪贴板中没有可粘贴的文字');
+      insertClipboard(payload, range);
     } catch {
       toast('无法读取剪贴板，请在正文按 Ctrl+V 或 ⌘V');
     }
@@ -443,6 +491,15 @@
     document.querySelector('.guide-reading').scrollTop = 0;
   }
   for (const link of guideTopics) link.onclick = () => showGuideTopic(link);
+  for (const choice of document.querySelectorAll('[data-guide-target]')) {
+    choice.onclick = () => {
+      guideQuery.value = '';
+      for (const link of guideTopics) link.hidden = false;
+      const id = choice.dataset.guideTarget;
+      showGuideTopic(guideTopics.find(link => link.getAttribute('aria-controls') === id));
+      $(id).focus({preventScroll: true});
+    };
+  }
   guideQuery.oninput = () => {
     const query = guideQuery.value.trim().toLowerCase();
     const current = guideTopics.find(link => link.hasAttribute('aria-current'));

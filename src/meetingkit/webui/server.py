@@ -144,6 +144,23 @@ def _spawn(fn, *args) -> None:
     threading.Thread(target=fn, args=args, daemon=True).start()
 
 
+def _windows_html_fragment(value: str) -> str:
+    """WinForms returns CF_HTML with a header whose offsets count UTF-8 bytes."""
+    if not value.startswith("Version:"):
+        return value
+    marked = re.search(r"<!--StartFragment-->(.*?)<!--EndFragment-->", value, re.DOTALL | re.IGNORECASE)
+    if marked:
+        return marked[1]
+    raw = value.encode("utf-8")
+    for part in ("Fragment", "HTML"):
+        start = re.search(rf"^Start{part}:(\d+)\s*$", value, re.MULTILINE)
+        end = re.search(rf"^End{part}:(\d+)\s*$", value, re.MULTILINE)
+        if start and end and 0 <= int(start[1]) < int(end[1]) <= len(raw):
+            return raw[int(start[1]):int(end[1])].decode("utf-8", errors="replace")
+    first_tag = value.find("<")
+    return value[first_tag:] if first_tag >= 0 else ""
+
+
 class Api:
     """暴露给 JS 的方法（pywebview 自动驼峰化：get_status -> get_status）。"""
 
@@ -161,24 +178,41 @@ class Api:
         _state.set(devices=devs)
         return {"ok": True, "devices": devs}
 
-    def read_clipboard_text(self) -> dict:
-        """Read only the text representation for an explicit paste in the editor."""
+    def read_editor_clipboard(self, formatted: bool) -> dict:
+        """Read the formats requested by the user's paste command."""
         try:
             if IS_WINDOWS:
                 from System import Func, String
-                from System.Windows.Forms import Clipboard
+                from System.Windows.Forms import Clipboard, DataFormats
 
-                # The Windows clipboard must be opened on the form's STA thread.
-                text = _window.native.Invoke(Func[String](lambda: Clipboard.GetText()))
+                def read_on_sta():
+                    data = Clipboard.GetDataObject()
+                    text = data.GetData(DataFormats.UnicodeText) if data is not None else ""
+                    html = data.GetData(DataFormats.Html) if formatted and data is not None else ""
+                    return json.dumps({"text": str(text or ""), "html": _windows_html_fragment(str(html or ""))})
+
+                # Keep both representations on the same clipboard snapshot and STA.
+                payload = json.loads(str(_window.native.Invoke(Func[String](read_on_sta))))
             elif IS_MACOS:
-                from AppKit import NSPasteboard, NSPasteboardTypeString
+                from AppKit import NSPasteboard, NSPasteboardTypeHTML, NSPasteboardTypeString
 
-                text = NSPasteboard.generalPasteboard().stringForType_(NSPasteboardTypeString)
+                board = NSPasteboard.generalPasteboard()
+                # Take both formats from the same item even if the clipboard changes.
+                items = board.pasteboardItems()
+                item = items[0] if items else None
+                text = item.stringForType_(NSPasteboardTypeString) if item else ""
+                html = item.stringForType_(NSPasteboardTypeHTML) if formatted and item else ""
+                payload = {"text": str(text or ""), "html": str(html or "")}
             else:
                 return {"ok": False}
-            return {"ok": True, "text": str(text or "")}
+            return {"ok": True, **payload}
         except Exception:
             return {"ok": False}
+
+    def read_clipboard_text(self) -> dict:
+        result = self.read_editor_clipboard(False)
+        result.pop("html", None)
+        return result
 
     def get_config(self) -> dict:
         c = _state.cfg
@@ -273,7 +307,7 @@ class Api:
         )
         title = (title or "").strip()
         _state.set(phase="recording", stage="recording", detail="",
-                   error=None, result=None, started_at=datetime.now(),
+                   error=None, result=None, session_dir=None, started_at=datetime.now(),
                    meeting_title=title, meeting_attendees=meeting_attendees,
                    meeting_detail_level=normalize_detail_level(detail_level),
                    mic_capture_enabled=True)
@@ -392,7 +426,7 @@ class Api:
                    meeting_title="",
                    meeting_detail_level=normalize_detail_level(detail_level),
                    phase="processing", stage="prepare", detail=str(p.name),
-                   error=None, result=None)
+                   error=None, result=None, session_dir=None)
         _spawn(self._process_worker, None, p)
         return {"ok": True}
 
@@ -472,15 +506,25 @@ class Api:
             _state.log(f"选择目录失败：{exc}")
         return ""
 
-    def open_output_dir(self) -> dict:
+    def open_output_dir(self, minutes_path: str = "", task: bool = False) -> dict:
         try:
-            output = _state.cfg.resolved_output_dir().resolve()
+            if minutes_path:
+                output = self._session_from_minutes(minutes_path)
+            elif task:
+                with _state.lock:
+                    output = _state.session_dir
+                if output is None:
+                    raise RuntimeError("当前任务还没有会议文件夹")
+                if not output.is_dir():
+                    raise FileNotFoundError("本场会议文件夹不存在或已被移除")
+            else:
+                output = _state.cfg.resolved_output_dir().resolve()
             _reveal(output)
-            _state.log(f"已打开输出目录：{output}")
+            _state.log(f"已打开文件夹：{output}")
             return {"ok": True, "path": str(output)}
         except Exception as exc:
-            _state.log(f"打开输出目录失败：{exc}")
-            return {"ok": False, "error": f"打开输出目录失败：{exc}"}
+            _state.log(f"打开文件夹失败：{exc}")
+            return {"ok": False, "error": f"打开文件夹失败：{exc}"}
 
     def reveal(self, path: str) -> dict:
         try:

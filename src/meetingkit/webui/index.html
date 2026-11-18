@@ -198,7 +198,7 @@
           <button class="button secondary compact" id="btnSpeakerMapping" type="button" disabled>匹配参会人</button>
           <button class="button secondary compact" id="btnTranscript" type="button" disabled>查看转写</button>
           <button class="button secondary compact" id="btnAudioCleanup" type="button" disabled>清理音频</button>
-          <button class="button secondary compact" id="btnOpenFolder" type="button" disabled>打开文件夹</button>
+          <button class="button secondary compact" id="btnOpenFolder" type="button" disabled>打开本场会议文件夹</button>
           <button class="button secondary compact" id="btnExport" type="button" disabled>导出</button>
           <button class="button primary compact" id="btnSaveMinutes" type="button" disabled>保存纪要</button>
         </div>
@@ -305,30 +305,39 @@
         <button class="modal-close" data-close="guideOverlay" type="button" aria-label="关闭使用说明">×</button></header>
       <div class="guide-search"><input type="search" id="guideQuery" aria-label="搜索使用说明" placeholder="搜索功能或问题，例如「粘贴」「麦克风」"></div>
 <div class="guide-layout"><nav id="guideTopics" aria-label="使用说明目录">
-<button type="button" aria-controls="helpTopic0" aria-current="true">首次配置</button>
-<button type="button" aria-controls="helpTopic1">工作台与历史会议</button>
-<button type="button" aria-controls="helpTopic2">录制会议与麦克风</button>
-<button type="button" aria-controls="helpTopic3">导入音频和会议视频</button>
-<button type="button" aria-controls="helpTopic4">编辑标题、正文与表格</button>
-<button type="button" aria-controls="helpTopic5">术语校对与个人术语库</button>
-<button type="button" aria-controls="helpTopic6">匹配参会人与试听原文</button>
-<button type="button" aria-controls="helpTopic7">重新生成、保存与导出</button>
-<button type="button" aria-controls="helpTopic8">管理文件与释放空间</button>
-<button type="button" aria-controls="helpTopic9">常见问题</button>
+<button type="button" aria-controls="helpTopic0" aria-current="true">选择会议来源</button>
+<button type="button" aria-controls="helpTopic1">首次配置</button>
+<button type="button" aria-controls="helpTopic2">工作台与历史会议</button>
+<button type="button" aria-controls="helpTopic3">现场会议录制</button>
+<button type="button" aria-controls="helpTopic4">已有文件导入</button>
+<button type="button" aria-controls="helpTopic5">纪要档位与处理进度</button>
+<button type="button" aria-controls="helpTopic6">编辑标题、正文与表格</button>
+<button type="button" aria-controls="helpTopic7">术语校对与个人术语库</button>
+<button type="button" aria-controls="helpTopic8">匹配参会人与试听原文</button>
+<button type="button" aria-controls="helpTopic9">重新生成、保存与导出</button>
+<button type="button" aria-controls="helpTopic10">管理文件与释放空间</button>
+<button type="button" aria-controls="helpTopic11">常见问题</button>
 </nav><div class="guide-reading">
-<article id="helpTopic0" tabindex="0"><h3>首次配置</h3>
+<article id="helpTopic0" tabindex="0"><h3>选择会议来源</h3>
+<p>根据手头的材料，选择一种方式开始。</p>
+<ul class="guide-choices">
+<li><button type="button" data-guide-target="helpTopic3"><strong>会议正在进行</strong><span>打开「会议录制」，录下会议内声和麦克风。</span></button></li>
+<li><button type="button" data-guide-target="helpTopic4"><strong>已有录音或视频</strong><span>打开「导入生成」，直接选择音频文件或 Teams 录屏。</span></button></li>
+</ul>
+<p>两种方式都会生成纪要。生成后，在「纪要编辑」核对术语、匹配参会人并导出。</p></article>
+<article id="helpTopic1" tabindex="0" hidden><h3>首次配置</h3>
 <h4>连接百炼</h4>
 <p>打开左栏底部的「偏好设置」，在「模型、设备与输出目录」一行点「设置」。填入百炼 API Key。使用官方服务时，API 网关留空即可。使用公司专属网关时，填写管理员提供的服务域名。保存后，录制和导入共用这份配置。</p>
 <h4>选择文件保存位置</h4>
-<p>在同一个设置页点「输出目录」旁的「浏览」，选择一个有写入权限的文件夹。程序在这里为每场会议建立子文件夹。右上角的文件夹按钮可以直接打开输出目录。更换目录后，工作台显示新目录中的会议，原目录的文件仍留在原处。</p>
+<p>在同一个设置页点「输出目录」旁的「浏览」，选择一个有写入权限的文件夹。程序在这里为每场会议建立子文件夹。在工作台点右上角的文件夹图标，可查看所有会议。更换目录后，工作台显示新目录中的会议，原目录的文件仍留在原处。</p>
 <h4>阅读与参会人偏好</h4>
 <p>在「偏好设置」中调整正文字号或打开「减少动态效果」。字号只影响屏幕阅读。经常一起开会的人可以先加到设置里的「常用参会人」，录制或导入时再点选本场出席者，也可以直接粘贴多行姓名。</p></article>
-<article id="helpTopic1" tabindex="0" hidden><h3>工作台与历史会议</h3>
+<article id="helpTopic2" tabindex="0" hidden><h3>工作台与历史会议</h3>
 <h4>接着编辑上次的纪要</h4>
 <p>点首页封面上的「继续编辑」，可回到上次打开的会议。首次使用时，可以直接点「开始会议」或「导入文件」。编辑页左侧的会议列表也可以搜索和切换历史记录。</p>
 <h4>先看还有哪些词要核对</h4>
 <p>「校对待办」显示待处理术语的总数，并列出前三项。点击术语，直接打开对应会议并定位到正文。「会议记录」中的「待校对」会筛出所有仍有待确认术语的会议，可再按会议名称搜索。</p></article>
-<article id="helpTopic2" tabindex="0" hidden><h3>录制会议与麦克风</h3>
+<article id="helpTopic3" tabindex="0" hidden><h3>现场会议录制</h3>
 <h4>开始前先选声源</h4>
 <p>会议内声记录对方和共享内容的播放声音，麦克风外录记录你这边的声音。在「会议录制」填好标题、参会人和纪要档位后，检查两路设备，再点「开始录音」。</p>
 <ul>
@@ -340,9 +349,11 @@
 <p>需要和身边的人说话时，在助手里点「暂停外录」。会议内声和计时继续，麦克风轨在这段时间写入静音。回来后点「恢复外录」。Teams 等会议软件的静音控制的是通话，助手里的外录开关控制写入本地录音的声音。</p>
 <h4>结束录制</h4>
 <p>点录音按钮结束。程序会整理双轨、混合音频，再依次上传、转写和生成纪要。处理结束可点「打开纪要」。切换到其他页面时，录制控制条仍可返回录制页或暂停外录。</p></article>
-<article id="helpTopic3" tabindex="0" hidden><h3>导入音频和会议视频</h3>
+<article id="helpTopic4" tabindex="0" hidden><h3>已有文件导入</h3>
 <h4>使用已有的 Teams 录屏</h4>
-<p>在「导入生成」选择本机的 MP4、MOV 或 WAV、MP3、M4A、FLAC 等文件，按需添加参会人，选好档位后点「开始生成纪要」。云盘中的文件应先下载到本机。导入使用所选文件的声音，无需打开麦克风。</p>
+<p>在「导入生成」选择本机的 MP4、MOV 或 WAV、MP3、M4A、FLAC 等文件，按需添加参会人，选好档位后点「开始生成纪要」。云盘中的文件应先下载到本机。导入使用所选文件的声音，无需打开麦克风。</p></article>
+<article id="helpTopic5" tabindex="0" hidden><h3>纪要档位与处理进度</h3>
+<p>现场录制和文件导入都可以选择纪要档位，并在提交后查看进度。</p>
 <h4>选择纪要详细程度</h4>
 <ul>
 <li>简要适合快速查看会议结论和行动项。</li>
@@ -351,33 +362,37 @@
 </ul>
 <h4>查看处理进度</h4>
 <p>展开「运行日志」，看最后一条停在准备、上传、云端转写还是生成纪要。上传耗时与文件大小和上行网速有关，转写还取决于实际音频时长。同样大小的视频可能有不同的处理时间。</p></article>
-<article id="helpTopic4" tabindex="0" hidden><h3>编辑标题、正文与表格</h3>
+<article id="helpTopic6" tabindex="0" hidden><h3>编辑标题、正文与表格</h3>
 <h4>修改标题与正文</h4>
 <p>在「纪要编辑」中点会议标题即可改名。正文可直接输入，修改会自动保存。等待「已保存到本机」提示，或按 Ctrl+S（macOS 用 ⌘S）立即保存。格式菜单可选正文、一级至六级标题和引用。</p>
-<h4>粘贴为纯文本</h4>
-<p>把光标放在插入处，右键点「粘贴为纯文本」。要覆盖一段文字，先选中它，再在选区内右键粘贴。从 Word、网页或邮件复制的文字会沿用当前段落样式，并保留换行。直接按 Ctrl+V 或 ⌘V 也能这样粘贴。粘错时可用工具栏的「撤销」。</p>
+<h4>粘贴或粘贴为纯文本</h4>
+<p>在插入位置右键。要覆盖一段文字，先选中它，再在选区内右键。</p>
+<ul>
+<li>「粘贴」保留剪贴板里的标题、粗体、斜体、列表、链接和表格等纪要格式。Windows 按 Ctrl+V、macOS 按 ⌘V 也可粘贴。</li>
+<li>「粘贴为纯文本」只取文字和换行，沿用光标处的样式。粘错时，点工具栏的「撤销」。</li>
+</ul>
 <h4>调整表格与编辑空间</h4>
 <p>点工具栏的表格图标插入表格，再点一个单元格。「+行」「−行」「+列」「−列」作用于当前单元格所在的行或列。点「专注模式」可收起侧栏，按 Esc 返回。「校对」按钮可单独收起或展开右侧面板。</p></article>
-<article id="helpTopic5" tabindex="0" hidden><h3>术语校对与个人术语库</h3>
+<article id="helpTopic7" tabindex="0" hidden><h3>术语校对与个人术语库</h3>
 <h4>确认原词或全文替换</h4>
 <p>打开右侧「校对」，点一个术语查看上下文和出现次数。反复点「定位正文」可逐处查看。用词正确时点「确认无误」。需要改写时，输入准确名称，点「全文替换」，核对替换次数后确认。替换范围是本场纪要正文，原始转写仍可在「原文」核对。</p>
 <h4>补上 AI 漏掉的术语</h4>
 <p>例如纪要里三次写成 AFC，正确名称是 AFRC。在校对栏输入正文里现有的 AFC 并点「添加」，它就会成为新的待办。定位核对后输入 AFRC，确认替换三处。查找时请保持与正文一致的大小写。</p>
 <h4>复查决定或复用准确写法</h4>
 <p>打开「已完成」可重新确认术语。刚完成的替换可点「撤回替换」，正文此后有改动时按提示检查对应段落。替换时勾选「记入我的术语库」，以后生成相关会议的纪要时会参考准确名称。左栏「个人术语库」也可手动添加或删除词条。</p></article>
-<article id="helpTopic6" tabindex="0" hidden><h3>匹配参会人与试听原文</h3>
+<article id="helpTopic8" tabindex="0" hidden><h3>匹配参会人与试听原文</h3>
 <h4>给本场说话人配上姓名</h4>
 <p>在编辑器的右侧「参会人」页签，点某位说话人旁的播放按钮，听一段发言。选中对应姓名，或选择「输入其他姓名」。匹配结果自动保存在本场会议，转写和纪要中相应的说话人标签会更新。</p>
 <h4>对照原话</h4>
 <p>在「原文」页签按时间戳查看发言，点击播放可试听该段。每场会议的说话人编号独立，下一场会议需要重新匹配。试听需要可用的本地会议音频和时间戳，清理音频后仍可查看转写文字。</p></article>
-<article id="helpTopic7" tabindex="0" hidden><h3>重新生成、保存与导出</h3>
+<article id="helpTopic9" tabindex="0" hidden><h3>重新生成、保存与导出</h3>
 <h4>已经生成，还想换档位</h4>
 <p>点标题旁的纪要档位，选择简要、标准或详细，再点重新生成并确认。程序复用当前会议已有的完整转写，生成新稿并重新校对。旧稿会备份在该会议目录的「纪要历史版本」中，可打开对照手动编辑过的内容。</p>
 <h4>导出一份可分享的纪要</h4>
 <p>右侧校对任务全部处理后，点「导出纪要」，选择目标文件夹。导出的是 Markdown 文件，可以在支持 Markdown 表格的编辑器中预览。日常编辑已自动保存，导出用于另存一份。导出按钮仍为灰色时，查看「校对」里还有几项待确认。</p></article>
-<article id="helpTopic8" tabindex="0" hidden><h3>管理文件与释放空间</h3>
+<article id="helpTopic10" tabindex="0" hidden><h3>管理文件与释放空间</h3>
 <h4>找到会议资料</h4>
-<p>在编辑页「更多（…）→ 打开文件夹」进入设置中的输出目录。每场会议有自己的文件夹，会议纪要.md 是当前稿，transcript.md 是完整转写。录制会议还会保存系统内声、麦克风和混合音频。</p>
+<p>编辑某场会议时，点「更多（…）→ 打开本场会议文件夹」或右上角的文件夹图标，都会进入这场会议的文件夹。会议纪要.md 是当前稿，transcript.md 是完整转写。录制会议还会保存系统内声、麦克风和混合音频。录制或导入期间也可用右上角图标打开当前任务的文件夹。要查看所有会议，回到工作台再点该图标。</p>
 <h4>清理录音</h4>
 <p>在「更多（…）→ 清理音频」选择范围，查看文件数和预计释放空间后再确认。</p>
 <ul>
@@ -387,7 +402,7 @@
 </ul>
 <h4>移除整场会议</h4>
 <p>在编辑页左侧历史列表中点会议旁的删除按钮，核对会议名和路径后再确认。这个操作会移除列表记录，并永久删除整个会议文件夹，包括纪要、转写、音频和里面自行放入的文件。只想腾出录音空间时请选择「清理音频」。</p></article>
-<article id="helpTopic9" tabindex="0" hidden><h3>常见问题</h3>
+<article id="helpTopic11" tabindex="0" hidden><h3>常见问题</h3>
 <h4>听得到对方，录不到自己</h4>
 <p>先看「麦克风」是否处于「已暂停」，再确认系统默认输入。Windows 可在开始录制前用「测试麦克风」检查设备，macOS 可在「系统设置 → 隐私与安全性 → 麦克风」检查权限。</p>
 <h4>上传失败或长时间没有进展</h4>
@@ -404,12 +419,13 @@
         <button class="modal-close" data-close="changelogOverlay" type="button" aria-label="关闭更新日志">×</button></header>
       <div class="release-timeline">
 <details class="release-entry" open>
-<summary><b>v0.3.0</b><strong>工作台与编辑界面优化</strong><span>本地更新 <time datetime="2026-11-18T09:15:00+08:00">2026-11-18 09:15</time></span></summary>
+<summary><b>v0.3.0</b><strong>工作台与编辑界面优化</strong><span>本地更新 <time datetime="2026-11-18T09:59:00+08:00">2026-11-18 09:59</time></span></summary>
 <div><ul>
 <li>工作台界面优化。首页可继续上次编辑、直接定位待校对术语，并按名称或校对状态筛选会议。</li>
 <li>四个页面使用左侧导航。个人术语库、使用说明、更新日志和偏好设置位于左栏下方。</li>
-<li>纪要编辑器支持纯文本粘贴，在正文右键选择「粘贴为纯文本」，可直接插入或替换选区。Ctrl+V 和 ⌘V 同样沿用当前段落样式。校对术语支持正文高亮和逐项展开。</li>
-<li>使用说明支持按主题查阅和关键词搜索。更新日志按版本展示历史发布时间。</li>
+<li>纪要正文右键可选「粘贴」或「粘贴为纯文本」。普通粘贴与 Ctrl+V、⌘V 保留支持的格式，纯文本粘贴沿用光标处样式。校对术语支持正文高亮和逐项展开。</li>
+<li>使用说明并列展示现场录制和已有文件导入两种场景，支持按主题查阅和关键词搜索。更新日志按版本展示历史发布时间。</li>
+<li>编辑纪要时，右上角和「更多」菜单中的文件夹按钮均打开所选会议的文件夹。工作台保留打开总输出目录的入口。</li>
 </ul></div></details>
 <details class="release-entry">
 <summary><b>v0.2.4</b><strong>标题编辑与手动术语校对</strong><span>发布 <time datetime="2026-11-11T19:33:00+08:00">2026-11-11 19:33</time></span></summary>
@@ -669,7 +685,8 @@
   <div id="editorContextMenu" class="editor-menu" role="menu" aria-label="正文编辑" hidden>
     <button role="menuitem" type="button" data-edit="cut">剪切</button>
     <button role="menuitem" type="button" data-edit="copy">复制</button>
-    <button role="menuitem" type="button" data-edit="paste">粘贴为纯文本</button>
+    <button role="menuitem" type="button" data-edit="paste">粘贴</button>
+    <button role="menuitem" type="button" data-edit="pastePlain">粘贴为纯文本</button>
     <button role="menuitem" type="button" data-edit="selectAll">全选正文</button>
   </div>
   <div class="toast hidden" id="toast" role="status"></div>

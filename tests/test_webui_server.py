@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 import numpy as np
+import pytest
 
 from meetingkit.audio.base import TrackSpec, write_wav_mono
 from meetingkit.config import Config
@@ -471,6 +472,44 @@ def test_open_output_dir_uses_the_configured_custom_path(tmp_path, monkeypatch):
 
     assert result == {"ok": True, "path": str(custom.resolve())}
     assert opened == [custom.resolve()]
+
+
+@pytest.mark.parametrize(("platform", "opener"), [("win32", "explorer.exe"), ("darwin", "open")])
+def test_open_folder_targets_selected_meeting_or_active_task(tmp_path, monkeypatch, platform, opener):
+    selected = tmp_path / "上周 会议"
+    recording = tmp_path / "当前 录音"
+    selected.mkdir()
+    recording.mkdir()
+    minutes = selected / server.pipeline_mod.MINUTES_MD
+    minutes.touch()
+    calls = []
+    monkeypatch.setattr(server._state, "cfg", Config(output_dir=str(tmp_path)))
+    monkeypatch.setattr(server._state, "session_dir", recording)
+    monkeypatch.setattr(server.sys, "platform", platform)
+    monkeypatch.setattr(server.subprocess, "Popen", calls.append)
+    api = server.Api()
+    assert api.open_output_dir(str(minutes))["ok"]
+    assert api.open_output_dir(task=True)["ok"]  # Recording already exists, minutes do not.
+    assert api.open_output_dir()["ok"]
+    assert calls == [[opener, str(folder.resolve())] for folder in (selected, recording, tmp_path)]
+
+    minutes.unlink()
+    monkeypatch.setattr(server._state, "session_dir", None)
+    assert not api.open_output_dir(str(minutes))["ok"]
+    assert not api.open_output_dir(task=True)["ok"]
+    assert len(calls) == 3
+
+
+def test_windows_clipboard_fragment_uses_utf8_offsets():
+    header = ("Version:1.0\r\nStartHTML:{:010d}\r\nEndHTML:{:010d}\r\n"
+              "StartFragment:{:010d}\r\nEndFragment:{:010d}\r\n")
+    prefix, selection, suffix = "<html><body>前文", "<b>本周会议</b>", "后文</body></html>"
+    start = len(header.format(0, 0, 0, 0))
+    fragment_start = start + len(prefix.encode())
+    fragment_end = fragment_start + len(selection.encode())
+    payload = header.format(start, fragment_end + len(suffix.encode()), fragment_start, fragment_end)
+    assert server._windows_html_fragment(payload + prefix + selection + suffix) == selection
+    assert server._windows_html_fragment(selection) == selection
 
 
 class _FakeMicMonitor:

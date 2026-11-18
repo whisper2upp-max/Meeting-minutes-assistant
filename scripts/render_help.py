@@ -20,17 +20,23 @@ def chapters(path):
         yield title.strip(), body
 
 
-def paragraphs(body):
+def paragraphs(body, topic_ids=None):
     html = []
     listing = False
     for line in map(str.strip, body.splitlines()):
         bullet = line.startswith("- ")
+        choice = re.fullmatch(r"- \[([^\]]+)\]\(#([^)]+)\) — (.+)", line) if topic_ids else None
         if listing and not bullet:
             html.append("</ul>")
         if not listing and bullet:
-            html.append("<ul>")
+            html.append('<ul class="guide-choices">' if choice else "<ul>")
         listing = bullet
         if not line:
+            continue
+        if choice:
+            label, target, description = choice.groups()
+            html.append(f'<li><button type="button" data-guide-target="{topic_ids[target]}">'
+                        f'<strong>{escape(label)}</strong><span>{escape(description)}</span></button></li>')
             continue
         if bullet:
             tag, line = "li", line[2:]
@@ -57,12 +63,14 @@ def overlay(name, title, content, subtitle):
 
 def render():
     topics, pages = [], []
-    for i, (title, body) in enumerate(chapters(ROOT / "docs/使用说明.md")):
+    manual_chapters = list(chapters(ROOT / "docs/使用说明.md"))
+    topic_ids = {title: f"helpTopic{i}" for i, (title, _) in enumerate(manual_chapters)}
+    for i, (title, body) in enumerate(manual_chapters):
         name = escape(title)
         current = ' aria-current="true"' if i == 0 else ""
         hidden = "" if i == 0 else " hidden"
         topics.append(f'<button type="button" aria-controls="helpTopic{i}"{current}>{name}</button>')
-        pages.append(f'<article id="helpTopic{i}" tabindex="0"{hidden}><h3>{name}</h3>\n{paragraphs(body)}</article>')
+        pages.append(f'<article id="helpTopic{i}" tabindex="0"{hidden}><h3>{name}</h3>\n{paragraphs(body, topic_ids)}</article>')
     manual = ('<div class="guide-search"><input type="search" id="guideQuery" aria-label="搜索使用说明" '
               'placeholder="搜索功能或问题，例如「粘贴」「麦克风」"></div>\n'
               '<div class="guide-layout"><nav id="guideTopics" aria-label="使用说明目录">\n' +
