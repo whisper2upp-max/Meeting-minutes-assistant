@@ -19,7 +19,7 @@
 | macOS | `会议纪要助手-macOS.zip` | 解压后将 App 移入“应用程序”，首次右键选择“打开” |
 | Windows | `Meeting-Minutes-Assistant-v0.3.0-Windows-x64-Setup.exe`（安装版） | 若 SmartScreen 提示，选择“更多信息 → 仍要运行” |
 
-详细说明：[macOS 使用指南](docs/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E-macOS.md) · [Windows 使用指南](docs/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E-Windows.md)
+详细说明：[功能使用手册](docs/使用说明.md) · [macOS 使用指南](docs/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E-macOS.md) · [Windows 使用指南](docs/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E-Windows.md)
 
 ## 它能做什么
 
@@ -62,7 +62,7 @@
   <img src="docs/images/minutes.png" alt="会议纪要编辑器" width="100%">
 </p>
 
-在纪要正文使用 Ctrl+V 或 ⌘V 粘贴文字会沿用当前段落样式。编辑工具栏也提供“粘贴为纯文本”。编辑器会将可视内容序列化回 Markdown，导出文件可被常见 Markdown 阅读器正确渲染。在右侧“参会人”栏试听样例发言并确认每个说话人的姓名，匹配结果按会议保存。历史列表支持搜索、滚动和删除整个会议文件夹；删除前会明确确认影响范围。
+在纪要正文使用 Ctrl+V 或 ⌘V 粘贴文字会沿用当前段落样式。也可在正文右键选择“粘贴为纯文本”，直接插入文字或替换选区。编辑器会将可视内容序列化回 Markdown，导出文件可被常见 Markdown 阅读器正确渲染。在右侧“参会人”栏试听样例发言并确认每个说话人的姓名，匹配结果按会议保存。历史列表支持搜索、滚动和删除整个会议文件夹；删除前会明确确认影响范围。
 
 点击“更多 → 清理音频”可查看当前会议与全部历史会议占用的音频空间。推荐在确认转写和纪要无误后删除 `track_system.wav` 与 `track_mic.wav`，仅保留混合后的 `audio.wav`；也可以只删除某场会议或全部历史会议的所有程序音频。音频清理不会删除纪要、完整转写、JSON 或会议文件夹。
 

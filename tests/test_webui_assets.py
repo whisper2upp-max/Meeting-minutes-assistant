@@ -206,3 +206,10 @@ def test_release_metadata_uses_github_identity_not_conversational_name():
     assert "[@whisper2upp-max]" in readme
     for content in (windows_version, readme, javascript):
         assert "Wesley Yan" not in content
+
+
+def test_offline_help_matches_versioned_manual_and_changelog():
+    import subprocess
+    import sys
+
+    subprocess.run([sys.executable, str(ROOT / "scripts/render_help.py"), "--check"], check=True)

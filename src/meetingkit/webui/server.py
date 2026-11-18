@@ -161,6 +161,25 @@ class Api:
         _state.set(devices=devs)
         return {"ok": True, "devices": devs}
 
+    def read_clipboard_text(self) -> dict:
+        """Read only the text representation for an explicit paste in the editor."""
+        try:
+            if IS_WINDOWS:
+                from System import Func, String
+                from System.Windows.Forms import Clipboard
+
+                # The Windows clipboard must be opened on the form's STA thread.
+                text = _window.native.Invoke(Func[String](lambda: Clipboard.GetText()))
+            elif IS_MACOS:
+                from AppKit import NSPasteboard, NSPasteboardTypeString
+
+                text = NSPasteboard.generalPasteboard().stringForType_(NSPasteboardTypeString)
+            else:
+                return {"ok": False}
+            return {"ok": True, "text": str(text or "")}
+        except Exception:
+            return {"ok": False}
+
     def get_config(self) -> dict:
         c = _state.cfg
         return {

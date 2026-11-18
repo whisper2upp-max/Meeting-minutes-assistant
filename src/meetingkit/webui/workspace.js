@@ -286,7 +286,6 @@
   document.querySelector('.editor-footer>span').textContent='更改自动保存到本机';
 
   const editor = $('minutesBody');
-  const pasteButton = $('btnPlainPaste');
   let highlightTimer;
   editor.addEventListener('input', () => {
     clearTimeout(highlightTimer);
@@ -322,36 +321,135 @@
     if (text) insertPlainText(text, currentEditorRange());
     else toast('剪贴板中没有可粘贴的文字');
   });
-  pasteButton.onmousedown = e => e.preventDefault();
-  pasteButton.onclick = async () => {
-    const path = state.activeMinutes;
-    if (!path || !editor.isContentEditable) return;
-    const range = currentEditorRange();
-    const stillEditing = () => path === state.activeMinutes && state.activeView === 'minutes';
-    try {
-      const text = await navigator.clipboard.readText();
-      if (!stillEditing()) return;
-      if (!text) return toast('剪贴板中没有可粘贴的文字');
-      insertPlainText(text, range);
-    } catch {
-      if (!stillEditing()) return;
-      // Some embedded WebViews disallow programmatic clipboard reads, even after a click.
-      showModal('粘贴为纯文本');
-      const label = el('label', 'paste-label', '在此粘贴文字，再插入纪要');
-      const field = el('textarea', 'paste-field');
-      field.id = 'plainPasteText';
-      label.htmlFor = field.id;
-      field.rows = 6;
-      const insert = button('插入正文', () => {
-        modal.close();
-        if (stillEditing()) insertPlainText(field.value, range);
-      }, 'w-btn primary');
-      insert.disabled = true;
-      field.oninput = () => { insert.disabled = !field.value.length; };
-      body.append(label, field);
-      foot.append(button('取消', () => modal.close()), insert);
-      field.focus();
+  const menu = $('editorContextMenu');
+  const menuButtons = [...menu.querySelectorAll('button')];
+  let menuRange = null;
+  function restoreSelection(range) {
+    editor.focus({preventScroll: true});
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+  }
+  function closeEditMenu(restore = false) {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    if (restore && menuRange && editor.contains(menuRange.commonAncestorContainer)) restoreSelection(menuRange);
+    menuRange = null;
+  }
+  function pointRange(x, y) {
+    if (document.caretPositionFromPoint) {
+      const point = document.caretPositionFromPoint(x, y);
+      if (!point) return null;
+      const range = document.createRange();
+      range.setStart(point.offsetNode, point.offset);
+      range.collapse(true);
+      return range;
     }
+    return document.caretRangeFromPoint?.(x, y);
+  }
+  function openEditMenu(range, x, y) {
+    if (!state.activeMinutes || !editor.isContentEditable || !range || !editor.contains(range.commonAncestorContainer)) return;
+    menuRange = range.cloneRange();
+    restoreSelection(menuRange);
+    menuButtons[0].disabled = menuButtons[1].disabled = range.collapsed;
+    menu.hidden = false;
+    menu.style.left = Math.max(4, Math.min(x, innerWidth - menu.offsetWidth - 4)) + 'px';
+    menu.style.top = Math.max(4, Math.min(y, innerHeight - menu.offsetHeight - 4)) + 'px';
+    menu.querySelector('[data-edit="paste"]').focus({preventScroll: true});
+  }
+
+  // Record the selection before the system's secondary click can select a word of its own.
+  let pointerRange = null;
+  editor.addEventListener('mousedown', event => {
+    if (event.button !== 2 && !(event.button === 0 && event.ctrlKey)) return;
+    const {clientX: x, clientY: y} = event;
+    const range = currentEditorRange();
+    const inSelection = range && !range.collapsed && [...range.getClientRects()].some(
+      rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom);
+    pointerRange = inSelection ? range : pointRange(x, y);
+  });
+  editor.addEventListener('contextmenu', event => {
+    if (!editor.isContentEditable) return;
+    event.preventDefault();
+    openEditMenu(pointerRange || currentEditorRange() || pointRange(event.clientX, event.clientY), event.clientX, event.clientY);
+    pointerRange = null;
+  });
+  editor.addEventListener('keydown', event => {
+    if (!(event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) return;
+    const range = currentEditorRange();
+    if (!range) return;
+    event.preventDefault();
+    const rect = range.getBoundingClientRect();
+    openEditMenu(range, rect.left, rect.bottom);
+  });
+
+  menu.addEventListener('mousedown', event => event.preventDefault());
+  menu.addEventListener('click', async event => {
+    const command = event.target.closest('button')?.dataset.edit;
+    const range = menuRange;
+    if (!command || !range) return;
+    closeEditMenu(true);
+    if (command === 'selectAll') {
+      range.selectNodeContents(editor);
+      restoreSelection(range);
+      return;
+    }
+    if (command !== 'paste') {
+      if (!document.execCommand(command)) toast(command === 'copy' ? '请使用系统复制快捷键' : '请使用系统剪切快捷键');
+      return;
+    }
+    const path = state.activeMinutes, request = state.minutesRequest, editRevision = revision;
+    try {
+      let text;
+      if (state.apiReady) {
+        const result = await api().read_clipboard_text();
+        if (result.ok) text = result.text;
+      }
+      if (text === undefined) text = await navigator.clipboard.readText();
+      if (state.activeView !== 'minutes' || path !== state.activeMinutes || request !== state.minutesRequest ||
+          editRevision !== revision || !editor.contains(range.commonAncestorContainer)) return;
+      if (text) insertPlainText(text, range);
+      else toast('剪贴板中没有可粘贴的文字');
+    } catch {
+      toast('无法读取剪贴板，请在正文按 Ctrl+V 或 ⌘V');
+    }
+  });
+  menu.addEventListener('keydown', event => {
+    if (event.key === 'Escape' || event.key === 'Tab') {
+      if (event.key === 'Escape') event.preventDefault();
+      event.stopPropagation();
+      closeEditMenu(true);
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const choices = menuButtons.filter(b => !b.disabled);
+      const next = choices.indexOf(document.activeElement) + (event.key === 'ArrowDown' ? 1 : -1);
+      choices[(next + choices.length) % choices.length].focus();
+    }
+  });
+  document.addEventListener('pointerdown', event => { if (!menu.contains(event.target)) closeEditMenu(); }, true);
+  document.addEventListener('scroll', () => closeEditMenu(), true);
+  window.addEventListener('resize', () => closeEditMenu());
+  window.addEventListener('blur', () => closeEditMenu());
+
+  const guideTopics = [...$('guideTopics').querySelectorAll('button')];
+  const guideQuery = $('guideQuery');
+  function showGuideTopic(active) {
+    for (const link of guideTopics) {
+      const article = $(link.getAttribute('aria-controls'));
+      article.hidden = link !== active;
+      if (link === active) link.setAttribute('aria-current', 'true');
+      else link.removeAttribute('aria-current');
+    }
+    $('guideNoResults').hidden = Boolean(active);
+    document.querySelector('.guide-reading').scrollTop = 0;
+  }
+  for (const link of guideTopics) link.onclick = () => showGuideTopic(link);
+  guideQuery.oninput = () => {
+    const query = guideQuery.value.trim().toLowerCase();
+    const current = guideTopics.find(link => link.hasAttribute('aria-current'));
+    for (const link of guideTopics) {
+      link.hidden = !$(link.getAttribute('aria-controls')).textContent.toLowerCase().includes(query);
+    }
+    showGuideTopic(current && !current.hidden ? current : guideTopics.find(link => !link.hidden));
   };
   function showPreferences(){showModal('偏好设置');const row=el('div','w-setting-row'),copy=el('div');copy.append(el('strong','','正文阅读字号'),el('small','','只影响屏幕显示，不影响导出'));const select=el('select');for(const [value,label] of [[14,'紧凑 · 14'],[15,'标准 · 15'],[17,'舒适 · 17']]){const o=el('option','',label);o.value=value;select.append(o);}select.value=prefs.font_size;select.onchange=async()=>{try{await savePrefs({font_size:Number(select.value)});}catch(e){toast(e.message);select.value=prefs.font_size;}};row.append(copy,select);body.append(row);const motion=el('div','w-setting-row'),mc=el('div');mc.append(el('strong','','减少动态效果'),el('small','','关闭过渡动画'));const toggle=button('',async()=>{try{await savePrefs({reduce_motion:!prefs.reduce_motion});toggle.classList.toggle('on',prefs.reduce_motion);toggle.setAttribute('aria-checked',String(prefs.reduce_motion));}catch(e){toast(e.message);}},'w-toggle'+(prefs.reduce_motion?' on':''));toggle.setAttribute('role','switch');toggle.setAttribute('aria-label','减少动态效果');toggle.setAttribute('aria-checked',String(prefs.reduce_motion));motion.append(mc,toggle);body.append(motion);const terms=el('div','w-setting-row'),tc=el('div');tc.append(el('strong','','个人术语库'),el('small','',prefs.terms.length+' 个已记住的名称'));terms.append(tc,button('管理',showDictionary));body.append(terms);const conn=el('div','w-setting-row');conn.append(el('strong','','模型、设备与输出目录'),button('设置',()=>{modal.close();openSettings();}));body.append(conn);foot.append(closeButton());}
   async function showDictionary(){showModal('我的术语库');body.append(el('p','','确认过的名称用于后续会议生成参考。删除不会改动历史纪要。'));const list=el('div','w-dictionary');for(const item of prefs.terms){const row=el('div','w-term-row');row.append(el('span','',item.from),el('span','','→'),el('strong','',item.to),button('删除',async()=>{try{await savePrefs({terms:prefs.terms.filter(x=>x.from!==item.from)});showDictionary();renderRecent();}catch(e){toast(e.message);}},'w-link'));list.append(row);}if(!prefs.terms.length)list.append(el('p','w-empty','还没有保存的术语'));body.append(list);const form=el('div','w-term-form'),from=el('input','w-input'),to=el('input','w-input');from.placeholder='原词 / 常见误写';to.placeholder='准确名称';from.setAttribute('aria-label','原词');to.setAttribute('aria-label','准确名称');form.append(from,to,button('添加',async()=>{try{await savePrefs({terms:[...prefs.terms,{from:from.value.trim(),to:to.value.trim()}]});showDictionary();renderRecent();}catch(e){toast(e.message);}},'w-btn primary'));body.append(form);foot.append(closeButton());}
