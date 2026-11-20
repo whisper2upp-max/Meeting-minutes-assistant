@@ -113,8 +113,49 @@ def test_dictionary_reference_reaches_generation_without_unrelated_terms(tmp_pat
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='# 会议纪要'))])
     client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
     monkeypatch.setattr(llm, 'OpenAI', lambda **kwargs: client)
-    monkeypatch.setattr(llm, 'proofread_minutes', lambda client, model, text: text)
     llm.generate_minutes('通过飞书妙季整理会议。', api_key='test')
     messages = json.dumps(calls[0]['messages'], ensure_ascii=False)
     assert '飞书妙记' in messages
     assert '无关名称' not in messages
+
+
+def test_old_term_can_gain_and_clear_meaning(meeting):
+    api = server.Api()
+    legacy = {'from': 'AFC', 'to': 'AFRC'}
+    assert api.save_workspace({'terms': [legacy]})['ok']
+    updated = {**legacy, 'meaning': '只在预算复核场景使用', 'aliases': ['预算复核组']}
+    assert api.save_workspace({'terms': [updated]})['ok']
+    assert api.get_workspace()['terms'] == [updated]
+    assert api.save_workspace({'terms': [{**updated, 'meaning': ''}]})['ok']
+    assert api.get_workspace()['terms'] == [{**legacy, 'aliases': ['预算复核组']}]
+
+
+@pytest.mark.parametrize('variant', ['AFC', ' a f c ', 'A.F.C.', 'a. F. c.', 'Ａ．Ｆ．Ｃ', 'aFc',
+                                      'aFrC', 'A\u00a0F\u00a0C', '预算复核组'])
+def test_glossary_candidate_reaches_writer_and_reviewer(tmp_path, monkeypatch, variant):
+    from types import SimpleNamespace
+    from meetingkit.cloud import llm
+    monkeypatch.setenv('MEETINGKIT_HOME', str(tmp_path))
+    meaning = '预算审批流程，仅用于复核预算。'
+    update_workspace({'terms': [{'from': 'AFC', 'to': 'AFRC', 'meaning': meaning, 'aliases': ['预算复核组']},
+                                {'from': '其他', 'to': '另外一个词', 'meaning': '无关释义'}]})
+    calls = []
+    def create(**kwargs):
+        calls.append(kwargs['messages'])
+        content = '# 本周预算已提交 AFRC。' if len(calls) == 1 else '{"uncertain":[],"corrections":[]}'
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+    monkeypatch.setattr(llm, 'OpenAI', lambda **kwargs: SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
+    result = llm.generate_minutes(f'本周预算已提交{variant}。', api_key='test')
+    assert result.review['status'] == 'done'
+    assert len(calls) == 2
+    for messages in calls:
+        prompt = json.dumps(messages, ensure_ascii=False)
+        assert meaning in prompt and '无关释义' not in prompt
+
+
+@pytest.mark.parametrize('text', ['CAFCA', 'afcost', 'XXAFRC', 'A.F.C.D', 'X.A.F.C', 'X A F C', 'A F C D',
+                                  'AFC2', 'A。下一位提到 FC', 'A\nF\nC'])
+def test_longer_codes_and_unrelated_speech_do_not_select_term(text):
+    from meetingkit.workspace import matching_terms
+    assert not matching_terms([{'from': 'AFC', 'to': 'AFRC'}], text)

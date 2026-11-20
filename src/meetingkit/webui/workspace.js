@@ -275,7 +275,20 @@
     if(!todo.length&&data?.status==='done'){const ready=el('div','w-complete');ready.append(el('span','','✓'),el('strong','','校对任务已完成'),el('p','','这份纪要可以导出了。'));review.append(ready);}
     if(done){const details=el('details','w-resolved');details.open=true;details.append(el('summary','','已完成 '+done+' 项'));for(const item of items.filter(x=>['confirmed','replaced'].includes(x.decision))){const row=el('div','w-resolved-row'),copy=el('div');copy.append(el('strong','',item.replacement||item.term),el('small','',item.decision==='confirmed'?'已确认无误':'已替换'));row.append(el('span','','✓'),copy,button(undo.has(item.term)?'撤回替换':'重新确认',()=>undoDecision(item),'w-link'));details.append(row);}review.append(details);}paintReviewTerms();updateReviewState();
   };
-  function requestReplacement(item,value){if(!value||value===item.term)return toast('请输入不同的准确名称，或确认无误');const count=textMatches(item.term).length;if(!count)return toast('正文已没有该词');showModal('替换 '+count+' 处词语');body.append(el('p','','仅修改当前会议纪要，原始转写保留不变。'),el('div','w-context',item.term+' → '+value));const label=el('label','w-check'),check=el('input');check.type='checkbox';check.checked=true;label.append(check,document.createTextNode('记入我的术语库，下次作为名称参考'));body.append(label);foot.append(button('取消',()=>modal.close()),button('确认替换',async()=>{const nodes=[...new Set(textMatches(item.term).map(x=>x[0]))],patch=nodes.map(node=>({node,before:node.data,after:node.data.split(item.term).join(value)}));for(const p of patch)p.node.data=p.after;undo.set(item.term,patch);item.decision='replaced';item.replacement=value;markDirty();renderProofreading(state.proofreading);modal.close();if(check.checked){try{await savePrefs({terms:[...prefs.terms.filter(x=>x.from!==item.term),{from:item.term,to:value}]});renderRecent();}catch(e){toast('替换已完成，但术语库未保存：'+e.message);}}},'w-btn primary'));}
+  async function rememberCorrection(original, name) {
+    const existing = prefs.terms.find(term => term.from === original);
+    if (existing?.to === name) return;
+    const terms = prefs.terms.filter(term => term.from !== original);
+    const matching = terms.filter(term => term.to === name);
+    if (matching.length === 1) {
+      const entry = matching[0];
+      const aliases = [...new Set([...(entry.aliases || []), original])];
+      await savePrefs({terms: terms.map(term => term === entry ? {...entry, aliases} : term)});
+    } else {
+      await savePrefs({terms: [...terms, {from: original, to: name}]});
+    }
+  }
+  function requestReplacement(item,value){if(!value||value===item.term)return toast('请输入不同的准确名称，或确认无误');const count=textMatches(item.term).length;if(!count)return toast('正文已没有该词');showModal('替换 '+count+' 处词语');body.append(el('p','','仅修改当前会议纪要，原始转写保留不变。'),el('div','w-context',item.term+' → '+value));const label=el('label','w-check'),check=el('input');check.type='checkbox';check.checked=true;label.append(check,document.createTextNode('记入我的术语库，下次作为名称参考'));body.append(label);foot.append(button('取消',()=>modal.close()),button('确认替换',async()=>{const nodes=[...new Set(textMatches(item.term).map(x=>x[0]))],patch=nodes.map(node=>({node,before:node.data,after:node.data.split(item.term).join(value)}));for(const p of patch)p.node.data=p.after;undo.set(item.term,patch);item.decision='replaced';item.replacement=value;markDirty();renderProofreading(state.proofreading);modal.close();if(check.checked){try{await rememberCorrection(item.term,value);renderRecent();}catch(e){toast('替换已完成，但术语库未保存：'+e.message);}}},'w-btn primary'));}
   function undoDecision(item){const patch=undo.get(item.term);if(patch){if(patch.some(p=>!$('minutesBody').contains(p.node)||p.node.data!==p.after))return toast('替换后的段落已继续编辑，请先手动恢复该词');patch.forEach(p=>p.node.data=p.before);undo.delete(item.term);delete item.replacement;}item.decision='pending';markDirty();renderProofreading(state.proofreading);}
   // A single save queue serializes manual saves, autosaves, navigation and mapping.
   function saveSnapshot(){const path=state.activeMinutes;if(!path||!state.apiReady)return Promise.resolve(false);const title=titleInput.value.trim();if(!title)return Promise.resolve(false);const heading=$('minutesBody').firstElementChild;if(title!==savedTitle){if(heading?.tagName==='H1')heading.textContent=title;else $('minutesBody').prepend(el('h1','',title));updateWordCount();}const content=editorToMarkdown($('minutesBody')),rev=revision,decisions=Object.fromEntries(reviewItems().map(x=>[x.term,{decision:x.decision||'pending',replacement:x.replacement||'',source:x.source||''}]));const job=async()=>{try{await call('save_minutes',path,content,decisions,title);const session=state.sessions.find(x=>x.minutes===path);if(session)session.title=title;if(path===state.activeMinutes&&rev===revision){savedTitle=title;markSaved();}renderRecent();renderSessionList();return true;}catch(e){toast('保存失败：'+e.message);return false;}};queue=queue.then(job,job);return queue;}
@@ -509,7 +522,69 @@
     showGuideTopic(current && !current.hidden ? current : guideTopics.find(link => !link.hidden));
   };
   function showPreferences(){showModal('偏好设置');const row=el('div','w-setting-row'),copy=el('div');copy.append(el('strong','','正文阅读字号'),el('small','','只影响屏幕显示，不影响导出'));const select=el('select');for(const [value,label] of [[14,'紧凑 · 14'],[15,'标准 · 15'],[17,'舒适 · 17']]){const o=el('option','',label);o.value=value;select.append(o);}select.value=prefs.font_size;select.onchange=async()=>{try{await savePrefs({font_size:Number(select.value)});}catch(e){toast(e.message);select.value=prefs.font_size;}};row.append(copy,select);body.append(row);const motion=el('div','w-setting-row'),mc=el('div');mc.append(el('strong','','减少动态效果'),el('small','','关闭过渡动画'));const toggle=button('',async()=>{try{await savePrefs({reduce_motion:!prefs.reduce_motion});toggle.classList.toggle('on',prefs.reduce_motion);toggle.setAttribute('aria-checked',String(prefs.reduce_motion));}catch(e){toast(e.message);}},'w-toggle'+(prefs.reduce_motion?' on':''));toggle.setAttribute('role','switch');toggle.setAttribute('aria-label','减少动态效果');toggle.setAttribute('aria-checked',String(prefs.reduce_motion));motion.append(mc,toggle);body.append(motion);const terms=el('div','w-setting-row'),tc=el('div');tc.append(el('strong','','个人术语库'),el('small','',prefs.terms.length+' 个已记住的名称'));terms.append(tc,button('管理',showDictionary));body.append(terms);const conn=el('div','w-setting-row');conn.append(el('strong','','模型、设备与输出目录'),button('设置',()=>{modal.close();openSettings();}));body.append(conn);foot.append(closeButton());}
-  async function showDictionary(){showModal('我的术语库');body.append(el('p','','确认过的名称用于后续会议生成参考。删除不会改动历史纪要。'));const list=el('div','w-dictionary');for(const item of prefs.terms){const row=el('div','w-term-row');row.append(el('span','',item.from),el('span','','→'),el('strong','',item.to),button('删除',async()=>{try{await savePrefs({terms:prefs.terms.filter(x=>x.from!==item.from)});showDictionary();renderRecent();}catch(e){toast(e.message);}},'w-link'));list.append(row);}if(!prefs.terms.length)list.append(el('p','w-empty','还没有保存的术语'));body.append(list);const form=el('div','w-term-form'),from=el('input','w-input'),to=el('input','w-input');from.placeholder='原词 / 常见误写';to.placeholder='准确名称';from.setAttribute('aria-label','原词');to.setAttribute('aria-label','准确名称');form.append(from,to,button('添加',async()=>{try{await savePrefs({terms:[...prefs.terms,{from:from.value.trim(),to:to.value.trim()}]});showDictionary();renderRecent();}catch(e){toast(e.message);}},'w-btn primary'));body.append(form);foot.append(closeButton());}
+  function showDictionary() {
+    showModal('我的术语库');
+    body.append(el('p', '', '纪要会参考与转写匹配的词条。可为容易混淆的名称补充含义和使用场景。'));
+    const list = el('div', 'w-dictionary');
+    for (const item of prefs.terms) {
+      const row = el('div', 'w-term-row'), copy = el('div', 'dictionary-copy');
+      copy.append(el('strong', '', item.to), el('small', '', [item.from, ...(item.aliases || [])].join(' · ')));
+      if (item.meaning) copy.append(el('p', '', item.meaning));
+      row.append(copy, button(item.meaning ? '编辑' : '补充含义', () => editDictionaryTerm(item), 'w-link'));
+      row.append(button('删除', async () => {
+        try {
+          await savePrefs({terms: prefs.terms.filter(term => term.from !== item.from)});
+          showDictionary();
+          renderRecent();
+        } catch (error) { toast(error.message); }
+      }, 'w-link'));
+      list.append(row);
+    }
+    if (!list.children.length) list.append(el('p', 'w-empty', '还没有保存的术语'));
+    body.append(list);
+    foot.append(button('添加术语', () => editDictionaryTerm(null)), closeButton());
+  }
+
+  function editDictionaryTerm(item) {
+    showModal(item ? '编辑术语' : '添加术语');
+    const form = el('form', 'dictionary-form');
+    function field(label, value, multiline = false) {
+      const wrap = el('label'), input = el(multiline ? 'textarea' : 'input', 'w-input');
+      wrap.append(el('span', '', label), input);
+      input.value = value || '';
+      form.append(wrap);
+      return input;
+    }
+    const to = field('准确名称', item?.to), from = field('原词或常见误写（选填）', item?.from);
+    from.maxLength = to.maxLength = 100;
+    to.required = true;
+    const aliases = field('其他别名（选填，每行一个）', item?.aliases?.join('\n'), true);
+    const meaning = field('含义与使用场景（选填）', item?.meaning, true);
+    meaning.maxLength = 500;
+    meaning.placeholder = '这个名称在会议中指什么？哪些情况下使用？';
+    body.append(form);
+    const save = button('保存', () => form.requestSubmit(), 'w-btn primary');
+    form.onsubmit = async event => {
+      event.preventDefault();
+      const name = to.value.trim();
+      if (!name) return toast('请输入准确名称');
+      const original = from.value.trim() || name;
+      if (prefs.terms.some(term => term.from === original && term.from !== item?.from)) {
+        return toast('这个原词已有词条，请在列表中编辑');
+      }
+      const entry = {from: original, to: name, meaning: meaning.value.trim(), aliases: aliases.value.split('\n')};
+      const terms = item ? prefs.terms.map(term => term.from === item.from ? entry : term) : [...prefs.terms, entry];
+      save.disabled = true;
+      try {
+        await savePrefs({terms});
+        showDictionary();
+        renderRecent();
+      } catch (error) { toast(error.message); }
+      finally { save.disabled = false; }
+    };
+    foot.append(button('取消', showDictionary), save);
+    (item ? meaning : to).focus();
+  }
   replaceControl('btnSettings',showPreferences);
   renderRecent();renderSessionList();switchTab('review');applyPrefs();
   const signal = document.createElement('div'); signal.className = 'capture-signals';

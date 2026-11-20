@@ -225,3 +225,11 @@
   .release-entry summary span { order: 1; width: 100%; }
   #guideTopics { padding: 6px; }
 }
+
+.dictionary-copy { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.dictionary-copy small { display: block; color: var(--soft); }
+.dictionary-copy p { margin: 4px 0 0; white-space: pre-wrap; }
+.w-term-row > .w-link { flex: none; margin-left: 0; }
+.dictionary-form { display: grid; gap: 13px; }
+.dictionary-form label { display: grid; gap: 5px; font-size: 13px; }
+.dictionary-form textarea { height: 60px; resize: vertical; }

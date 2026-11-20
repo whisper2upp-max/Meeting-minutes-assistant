@@ -2,7 +2,7 @@
 
 > 会议纪要助手：同步录制会议内声与麦克风，或导入已有音视频，自动完成说话人分离、全文转写和结构化会议纪要。
 
-[![Version](https://img.shields.io/badge/version-0.3.0-6648b3.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
+[![Version](https://img.shields.io/badge/version-0.3.1-6648b3.svg)](https://github.com/whisper2upp-max/Meeting-minutes-assistant/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-18213d.svg)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0aa6b5.svg)
 
@@ -17,7 +17,7 @@
 | 平台 | 发布文件 | 首次启动 |
 | --- | --- | --- |
 | macOS | `会议纪要助手-macOS.zip` | 解压后将 App 移入“应用程序”，首次右键选择“打开” |
-| Windows | `Meeting-Minutes-Assistant-v0.3.0-Windows-x64-Setup.exe`（安装版） | 若 SmartScreen 提示，选择“更多信息 → 仍要运行” |
+| Windows | `Meeting-Minutes-Assistant-v0.3.1-Windows-x64-Setup.exe`（安装版） | 若 SmartScreen 提示，选择“更多信息 → 仍要运行” |
 
 详细说明：[功能使用手册](docs/使用说明.md) · [macOS 使用指南](docs/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E-macOS.md) · [Windows 使用指南](docs/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E-Windows.md)
 
@@ -39,7 +39,7 @@
 
 工作台可继续上次编辑，按名称或校对状态查找会议。点击校对待办中的术语可直接定位正文。左栏下方可打开个人术语库、使用说明、更新日志和偏好设置。纪要编辑使用会议列表、正文和辅助侧栏三栏布局；专注模式可收起辅助信息，按 Esc 返回。
 
-校对任务显示上下文与出现次数，可确认无误或全文替换。准确名称可加入个人术语库，供后续会议生成参考。全部术语确认后才能导出。
+校对任务显示上下文与出现次数，可确认无误或全文替换。个人术语库可维护别名和可选的含义与使用场景。生成和校对纪要时，模型会参考匹配词条的释义；AFC、A F C 和 A.F.C. 均可匹配同一缩写。全部术语确认后才能导出。
 
 在侧栏试听说话人的发言并匹配姓名；原文支持按时间戳分段试听。试听使用本机保存的会议音频，不额外上传。音频被清理后仍可查看文字，旧会议没有时间戳时显示完整转写。播放格式支持取决于系统浏览器内核。
 
