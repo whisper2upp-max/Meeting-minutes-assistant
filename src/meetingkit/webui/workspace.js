@@ -194,7 +194,31 @@
   function renderSource(){sourcePane.replaceChildren(el('div','w-pane-heading','会议转写'),el('p','w-hint','保留原始表述，方便对照纪要。'));if(!segments)return;if(!segments.audio_url)sourcePane.append(el('p','w-audio-unavailable',segments.audio_message));for(const s of segments.segments){const row=el('div','w-transcript-segment'),head=el('div','w-speaker-head');head.append(el('span','w-avatar',s.speaker.slice(-1)),el('strong','',s.speaker),el('time','',formatTime(s.begin)),playButton(s));row.append(head,el('p','',s.text));sourcePane.append(row);}if(!segments.segments.length)sourcePane.append(el('div','w-plain-transcript',segments.content||'本次会议没有转写内容'));}
   function renderPeople(){peoplePane.replaceChildren(el('div','w-pane-heading','匹配发言人'),el('p','w-hint','听取发言片段，再把说话人与姓名对应。'));if(!speakers)return;for(const s of speakers.speakers){const card=el('section','w-speaker-card'),head=el('div','w-speaker-head'),name=speakers.mapping[String(s.number)]||'';head.append(el('span','w-avatar',name.slice(-1)||s.number),el('strong','','说话人 '+s.number));const sample=segments?.segments.find(x=>x.number===s.number&&x.end>x.begin);if(sample)head.append(playButton(sample));const input=el('input','w-input');input.value=name;input.placeholder='选择或输入准确姓名';input.setAttribute('aria-label','说话人 '+s.number+' 的姓名');input.setAttribute('list','wSpeakerNames');input.maxLength=40;input.onchange=()=>updateSpeaker(s.number,input);input.hidden=true;const select=el('select');select.setAttribute('aria-label','说话人 '+s.number+' 的参会人');const options=[['','选择参会人'],...[...new Set([...speakers.candidates,...Object.values(speakers.mapping)])].filter(Boolean).map(n=>[n,n]),['__custom__','输入其他姓名…']];for(const [value,label]of options){const option=el('option','',label);option.value=value;select.append(option);}select.value=name;select.onchange=()=>{if(select.value==='__custom__'){input.hidden=false;input.value='';input.focus();}else updateSpeaker(s.number,select);};card.append(head,el('p','w-speaker-quote',sample?.text||s.sample||'没有可用发言片段'),select,input);peoplePane.append(card);}const list=el('datalist');list.id='wSpeakerNames';speakers.candidates.forEach(n=>{const o=el('option');o.value=n;list.append(o);});peoplePane.append(list,el('p','w-hint','选择后自动保存，姓名应用于当前会议。'));if(!speakers.speakers.length)peoplePane.append(el('p','w-hint','这场会议没有可匹配的说话人标签。'));}
   async function updateSpeaker(number,input){const path=state.activeMinutes;const old={...speakers.mapping},map={...old,[number]:input.value.trim()};input.disabled=true;try{if(!await saveMinutes())return;const r=await call('save_speaker_mapping',path,map);if(path!==state.activeMinutes)return;speakers.mapping=r.mapping;state.speakerMapping=r.mapping;const oldName=old[number],newName=r.mapping[number]||('说话人'+number);if(oldName&&oldName!==newName)replaceText(oldName,newName);replaceSpeakerLabels(r.mapping);markDirty();await saveMinutes();await loadContext();toast('说话人姓名已保存');}catch(e){toast(e.message);input.value=old[number]||'';}finally{input.disabled=false;}}
-  function textMatches(term){if(!term)return [];const nodes=[],w=document.createTreeWalker($('minutesBody'),NodeFilter.SHOW_TEXT);while(w.nextNode()){let pos=0,i;while((i=w.currentNode.data.indexOf(term,pos))!==-1){nodes.push([w.currentNode,i]);pos=i+term.length;}}return nodes;}
+  function textMatches(term) {
+    if (!term) return [];
+    const matches = [], walker = document.createTreeWalker($('minutesBody'), NodeFilter.SHOW_TEXT);
+    const latinStart = /^[a-z0-9]/i.test(term), latinEnd = /[a-z0-9]$/i.test(term);
+    while (walker.nextNode()) {
+      const node = walker.currentNode, text = node.data;
+      let pos = 0, at;
+      while ((at = text.indexOf(term, pos)) !== -1) {
+        pos = at + term.length;
+        if (latinStart && /[a-z0-9]/i.test(text.charAt(at - 1))) continue;
+        if (latinEnd && /[a-z0-9]/i.test(text.charAt(pos))) continue;
+        matches.push([node, at]);
+      }
+    }
+    return matches;
+  }
+
+  function replacementPatch(term, value) {
+    const changes = new Map();
+    for (const [node, at] of textMatches(term).reverse()) {
+      const after = changes.get(node) ?? node.data;
+      changes.set(node, after.slice(0, at) + value + after.slice(at + term.length));
+    }
+    return Array.from(changes, ([node, after]) => ({node, before: node.data, after}));
+  }
   function replaceText(from,to){const w=document.createTreeWalker($('minutesBody'),NodeFilter.SHOW_TEXT);while(w.nextNode())w.currentNode.data=w.currentNode.data.split(from).join(to);}
   function matchRange(node, offset, term) {
     const range = document.createRange();
@@ -270,25 +294,46 @@
         continue;
       }
       const card=el('section','w-review-card'+(item.term===selectedTerm?' selected':'')),title=el('div','w-term-title'),matches=textMatches(item.term);title.append(el('span','w-term-index',index+1),el('strong','',item.term),el('small','',matches.length+' 处'));card.append(title,el('p','w-hint',item.reason||'请确认准确名称'));if(matches.length){const[node,at]=matches[0];card.append(el('blockquote','w-context','“'+node.data.slice(Math.max(0,at-25),at+item.term.length+45)+'”'));}card.append(button('⌖ 定位正文'+(locationIndex[item.term]?' · 第 '+locationIndex[item.term]+' 处':''),()=>locateTerm(item),'w-locate'));
-      const input=el('input','w-input');input.placeholder='输入准确名称';input.setAttribute('aria-label',item.term+'的准确名称');input.value=item.replacement_draft||prefs.terms.find(t=>t.from===item.term)?.to||'';input.oninput=()=>{item.replacement_draft=input.value;};const actions=el('div','w-review-actions');actions.append(button('✓ 确认无误',()=>{item.decision='confirmed';markDirty();renderProofreading(state.proofreading);},'w-btn small'),button('全文替换',()=>requestReplacement(item,input.value.trim()),'w-btn subtle small'));card.append(input,actions);review.append(card);
+      const input=el('input','w-input');input.placeholder='输入准确名称';input.setAttribute('aria-label',item.term+'的准确名称');input.value=item.replacement_draft||suggestedName(item.term)||'';input.oninput=()=>{item.replacement_draft=input.value;};const actions=el('div','w-review-actions');actions.append(button('✓ 确认无误',()=>{item.decision='confirmed';markDirty();renderProofreading(state.proofreading);},'w-btn small'),button('全文替换',()=>requestReplacement(item,input.value.trim()),'w-btn subtle small'));card.append(input,actions);review.append(card);
     }
     if(!todo.length&&data?.status==='done'){const ready=el('div','w-complete');ready.append(el('span','','✓'),el('strong','','校对任务已完成'),el('p','','这份纪要可以导出了。'));review.append(ready);}
     if(done){const details=el('details','w-resolved');details.open=true;details.append(el('summary','','已完成 '+done+' 项'));for(const item of items.filter(x=>['confirmed','replaced'].includes(x.decision))){const row=el('div','w-resolved-row'),copy=el('div');copy.append(el('strong','',item.replacement||item.term),el('small','',item.decision==='confirmed'?'已确认无误':'已替换'));row.append(el('span','','✓'),copy,button(undo.has(item.term)?'撤回替换':'重新确认',()=>undoDecision(item),'w-link'));details.append(row);}review.append(details);}paintReviewTerms();updateReviewState();
   };
-  async function rememberCorrection(original, name) {
-    const existing = prefs.terms.find(term => term.from === original);
-    if (existing?.to === name) return;
-    const terms = prefs.terms.filter(term => term.from !== original);
-    const matching = terms.filter(term => term.to === name);
-    if (matching.length === 1) {
-      const entry = matching[0];
-      const aliases = [...new Set([...(entry.aliases || []), original])];
-      await savePrefs({terms: terms.map(term => term === entry ? {...entry, aliases} : term)});
-    } else {
-      await savePrefs({terms: [...terms, {from: original, to: name}]});
-    }
+  function suggestedName(original) {
+    const entries = prefs.terms.filter(term => term.mistakes.includes(original) || term.aliases.includes(original));
+    return entries.length === 1 ? entries[0].to : '';
   }
-  function requestReplacement(item,value){if(!value||value===item.term)return toast('请输入不同的准确名称，或确认无误');const count=textMatches(item.term).length;if(!count)return toast('正文已没有该词');showModal('替换 '+count+' 处词语');body.append(el('p','','仅修改当前会议纪要，原始转写保留不变。'),el('div','w-context',item.term+' → '+value));const label=el('label','w-check'),check=el('input');check.type='checkbox';check.checked=true;label.append(check,document.createTextNode('记入我的术语库，下次作为名称参考'));body.append(label);foot.append(button('取消',()=>modal.close()),button('确认替换',async()=>{const nodes=[...new Set(textMatches(item.term).map(x=>x[0]))],patch=nodes.map(node=>({node,before:node.data,after:node.data.split(item.term).join(value)}));for(const p of patch)p.node.data=p.after;undo.set(item.term,patch);item.decision='replaced';item.replacement=value;markDirty();renderProofreading(state.proofreading);modal.close();if(check.checked){try{await rememberCorrection(item.term,value);renderRecent();}catch(e){toast('替换已完成，但术语库未保存：'+e.message);}}},'w-btn primary'));}
+  function rememberCorrection(original, name) {
+    return savePrefs({glossary_edit: {entry: {to: name, mistakes: [original]}}});
+  }
+  function requestReplacement(item, typedName) {
+    const key = name => name.normalize('NFKC').toLowerCase();
+    const value = prefs.terms.find(entry => key(entry.to) === key(typedName))?.to || typedName;
+    if (!value || value === item.term) return toast('请输入不同的准确名称，或确认无误');
+    const count = textMatches(item.term).length;
+    if (!count) return toast('正文已没有该词');
+    showModal('替换 ' + count + ' 处词语');
+    body.append(el('p', '', '仅修改当前会议纪要，原始转写保留不变。'), el('div', 'w-context', item.term + ' → ' + value));
+    const label = el('label', 'w-check'), check = el('input');
+    check.type = 'checkbox';
+    check.checked = true;
+    label.append(check, document.createTextNode('将此写法记为该术语的常见误写'));
+    body.append(label);
+    foot.append(button('取消', () => modal.close()), button('确认替换', async () => {
+      const patch = replacementPatch(item.term, value);
+      for (const change of patch) change.node.data = change.after;
+      undo.set(item.term, patch);
+      item.decision = 'replaced';
+      item.replacement = value;
+      markDirty();
+      renderProofreading(state.proofreading);
+      modal.close();
+      if (check.checked) {
+        try { await rememberCorrection(item.term, value); renderRecent(); }
+        catch (error) { toast('替换已完成，但术语库未保存：' + error.message); }
+      }
+    }, 'w-btn primary'));
+  }
   function undoDecision(item){const patch=undo.get(item.term);if(patch){if(patch.some(p=>!$('minutesBody').contains(p.node)||p.node.data!==p.after))return toast('替换后的段落已继续编辑，请先手动恢复该词');patch.forEach(p=>p.node.data=p.before);undo.delete(item.term);delete item.replacement;}item.decision='pending';markDirty();renderProofreading(state.proofreading);}
   // A single save queue serializes manual saves, autosaves, navigation and mapping.
   function saveSnapshot(){const path=state.activeMinutes;if(!path||!state.apiReady)return Promise.resolve(false);const title=titleInput.value.trim();if(!title)return Promise.resolve(false);const heading=$('minutesBody').firstElementChild;if(title!==savedTitle){if(heading?.tagName==='H1')heading.textContent=title;else $('minutesBody').prepend(el('h1','',title));updateWordCount();}const content=editorToMarkdown($('minutesBody')),rev=revision,decisions=Object.fromEntries(reviewItems().map(x=>[x.term,{decision:x.decision||'pending',replacement:x.replacement||'',source:x.source||''}]));const job=async()=>{try{await call('save_minutes',path,content,decisions,title);const session=state.sessions.find(x=>x.minutes===path);if(session)session.title=title;if(path===state.activeMinutes&&rev===revision){savedTitle=title;markSaved();}renderRecent();renderSessionList();return true;}catch(e){toast('保存失败：'+e.message);return false;}};queue=queue.then(job,job);return queue;}
@@ -522,18 +567,29 @@
     showGuideTopic(current && !current.hidden ? current : guideTopics.find(link => !link.hidden));
   };
   function showPreferences(){showModal('偏好设置');const row=el('div','w-setting-row'),copy=el('div');copy.append(el('strong','','正文阅读字号'),el('small','','只影响屏幕显示，不影响导出'));const select=el('select');for(const [value,label] of [[14,'紧凑 · 14'],[15,'标准 · 15'],[17,'舒适 · 17']]){const o=el('option','',label);o.value=value;select.append(o);}select.value=prefs.font_size;select.onchange=async()=>{try{await savePrefs({font_size:Number(select.value)});}catch(e){toast(e.message);select.value=prefs.font_size;}};row.append(copy,select);body.append(row);const motion=el('div','w-setting-row'),mc=el('div');mc.append(el('strong','','减少动态效果'),el('small','','关闭过渡动画'));const toggle=button('',async()=>{try{await savePrefs({reduce_motion:!prefs.reduce_motion});toggle.classList.toggle('on',prefs.reduce_motion);toggle.setAttribute('aria-checked',String(prefs.reduce_motion));}catch(e){toast(e.message);}},'w-toggle'+(prefs.reduce_motion?' on':''));toggle.setAttribute('role','switch');toggle.setAttribute('aria-label','减少动态效果');toggle.setAttribute('aria-checked',String(prefs.reduce_motion));motion.append(mc,toggle);body.append(motion);const terms=el('div','w-setting-row'),tc=el('div');tc.append(el('strong','','个人术语库'),el('small','',prefs.terms.length+' 个已记住的名称'));terms.append(tc,button('管理',showDictionary));body.append(terms);const conn=el('div','w-setting-row');conn.append(el('strong','','模型、设备与输出目录'),button('设置',()=>{modal.close();openSettings();}));body.append(conn);foot.append(closeButton());}
-  function showDictionary() {
+  async function showDictionary() {
+    if (state.apiReady) {
+      try { prefs = {...prefs, ...await call('get_workspace')}; }
+      catch (error) { toast(error.message); return; }
+    }
     showModal('我的术语库');
     body.append(el('p', '', '纪要会参考与转写匹配的词条。可为容易混淆的名称补充含义和使用场景。'));
     const list = el('div', 'w-dictionary');
     for (const item of prefs.terms) {
       const row = el('div', 'w-term-row'), copy = el('div', 'dictionary-copy');
-      copy.append(el('strong', '', item.to), el('small', '', [item.from, ...(item.aliases || [])].join(' · ')));
+      copy.append(el('strong', '', item.to));
+      for (const [label, values] of [['常见误写', item.mistakes], ['其他别名', item.aliases]]) {
+        if (!values.length) continue;
+        const tags = el('div', 'dictionary-tags');
+        tags.append(el('small', '', label));
+        for (const value of values) tags.append(el('span', 'dictionary-chip', value));
+        copy.append(tags);
+      }
       if (item.meaning) copy.append(el('p', '', item.meaning));
-      row.append(copy, button(item.meaning ? '编辑' : '补充含义', () => editDictionaryTerm(item), 'w-link'));
+      row.append(copy, button('编辑', () => editDictionaryTerm(item), 'w-link'));
       row.append(button('删除', async () => {
         try {
-          await savePrefs({terms: prefs.terms.filter(term => term.from !== item.from)});
+          await savePrefs({glossary_edit: {previous: item}});
           showDictionary();
           renderRecent();
         } catch (error) { toast(error.message); }
@@ -543,6 +599,42 @@
     if (!list.children.length) list.append(el('p', 'w-empty', '还没有保存的术语'));
     body.append(list);
     foot.append(button('添加术语', () => editDictionaryTerm(null)), closeButton());
+  }
+
+  function dictionaryTagField(form, label, initial) {
+    const group = el('fieldset', 'dictionary-tag-field'), tags = el('div', 'dictionary-tags');
+    const controls = el('div', 'dictionary-tag-controls'), input = el('input', 'w-input');
+    input.maxLength = 100;
+    input.placeholder = '输入后按回车或点添加';
+    input.setAttribute('aria-label', label);
+    const values = new Set(initial || []);
+    function render() {
+      tags.replaceChildren();
+      for (const value of values) {
+        const chip = el('span', 'dictionary-chip', value);
+        const remove = button('×', () => { values.delete(value); render(); input.focus(); }, 'chip-remove');
+        remove.setAttribute('aria-label', '移除' + label + '：' + value);
+        chip.append(remove);
+        tags.append(chip);
+      }
+    }
+    function add() {
+      const value = input.value.trim();
+      if (value) values.add(value);
+      input.value = '';
+      render();
+    }
+    input.onkeydown = event => {
+      if (event.key === 'Enter' && !event.isComposing && event.keyCode !== 229) {
+        event.preventDefault();
+        add();
+      }
+    };
+    controls.append(input, button('添加', () => { add(); input.focus(); }, 'w-btn small'));
+    group.append(el('legend', '', label), tags, controls);
+    form.append(group);
+    render();
+    return () => { add(); return [...values]; };
   }
 
   function editDictionaryTerm(item) {
@@ -555,12 +647,13 @@
       form.append(wrap);
       return input;
     }
-    const to = field('准确名称', item?.to), from = field('原词或常见误写（选填）', item?.from);
-    from.maxLength = to.maxLength = 100;
+    const to = field('准确名称', item?.to);
+    to.maxLength = 100;
     to.required = true;
-    const aliases = field('其他别名（选填，每行一个）', item?.aliases?.join('\n'), true);
+    const mistakes = dictionaryTagField(form, '常见误写', item?.mistakes);
+    const aliases = dictionaryTagField(form, '其他别名', item?.aliases);
     const meaning = field('含义与使用场景（选填）', item?.meaning, true);
-    meaning.maxLength = 500;
+    meaning.maxLength = Math.max(500, item?.meaning?.length || 0);
     meaning.placeholder = '这个名称在会议中指什么？哪些情况下使用？';
     body.append(form);
     const save = button('保存', () => form.requestSubmit(), 'w-btn primary');
@@ -568,22 +661,17 @@
       event.preventDefault();
       const name = to.value.trim();
       if (!name) return toast('请输入准确名称');
-      const original = from.value.trim() || name;
-      if (prefs.terms.some(term => term.from === original && term.from !== item?.from)) {
-        return toast('这个原词已有词条，请在列表中编辑');
-      }
-      const entry = {from: original, to: name, meaning: meaning.value.trim(), aliases: aliases.value.split('\n')};
-      const terms = item ? prefs.terms.map(term => term.from === item.from ? entry : term) : [...prefs.terms, entry];
+      const entry = {to: name, mistakes: mistakes(), aliases: aliases(), meaning: meaning.value.trim()};
       save.disabled = true;
       try {
-        await savePrefs({terms});
+        await savePrefs({glossary_edit: {previous: item, entry}});
         showDictionary();
         renderRecent();
       } catch (error) { toast(error.message); }
       finally { save.disabled = false; }
     };
     foot.append(button('取消', showDictionary), save);
-    (item ? meaning : to).focus();
+    to.focus();
   }
   replaceControl('btnSettings',showPreferences);
   renderRecent();renderSessionList();switchTab('review');applyPrefs();

@@ -9,6 +9,68 @@ _lock = threading.RLock()
 _DEFAULT = {"font_size": 15, "reduce_motion": False, "last_minutes": "", "terms": []}
 
 
+def _key(value):
+    return unicodedata.normalize('NFKC', value.strip()).casefold()
+
+
+def _canonical_terms(rows):
+    """Combine old from/to records and new tag records by the confirmed name."""
+    if not isinstance(rows, list):
+        raise ValueError('术语库格式无效')
+    glossary = {}
+    definitions = {}
+    for row in rows:
+        name = row['to'].strip()
+        if not name or len(name) > 100:
+            raise ValueError('准确名称必填，最多 100 字')
+        key = _key(name)
+        entry = glossary.setdefault(key, {'to': name, 'mistakes': [], 'aliases': []})
+        for field in ('mistakes', 'aliases'):
+            tags = row.get(field, [])
+            if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
+                raise ValueError('术语标签格式无效')
+            if field == 'mistakes' and 'from' in row:
+                if not row['from'].strip():
+                    raise ValueError('原词不能为空')
+                tags = [row['from'], *tags]
+            seen = {key, *map(_key, entry[field])}
+            for tag in tags:
+                tag = tag.strip()
+                if len(tag) > 100:
+                    raise ValueError('每个标签最多 100 字')
+                if tag and _key(tag) not in seen:
+                    entry[field].append(tag)
+                    seen.add(_key(tag))
+        meaning = (row.get('meaning') or '').strip()
+        if meaning:
+            definitions.setdefault(key, {})[meaning] = None
+    if len(glossary) > 500:
+        raise ValueError('术语库最多保存 500 个准确名称')
+    for key, meanings in definitions.items():
+        glossary[key]['meaning'] = '\n'.join(meanings)
+    return list(glossary.values())
+
+
+def _edit_glossary(terms, change):
+    # Apply one edit inside the workspace lock, preserving other concurrent additions.
+    old = change.get('previous')
+    new = change.get('entry')
+    rows = list(terms)
+    if old is not None:
+        if old not in rows:
+            raise ValueError('这条术语已更新，请重新打开术语库再编辑')
+        index = rows.index(old)
+        rows.pop(index)
+        if new is not None:
+            target = next((term for term in rows if _key(term['to']) == _key(new['to'])), None)
+            if target is not None:
+                new = {**new, 'to': target['to']}
+            rows.insert(index, new)
+    elif new is not None:
+        rows.append(new)
+    return _canonical_terms(rows)
+
+
 def read_workspace():
     with _lock:
         path = config_dir() / 'workspace.json'
@@ -17,7 +79,7 @@ def read_workspace():
         data = json.loads(path.read_text(encoding='utf-8'))
         if not isinstance(data, dict):
             raise ValueError('工作区配置格式无效')
-        return {**_DEFAULT, **data}
+        return {**_DEFAULT, **data, 'terms': _canonical_terms(data.get('terms', []))}
 
 
 def matching_terms(terms, transcript):
@@ -46,7 +108,7 @@ def matching_terms(terms, transcript):
         found[name] = bool(re.search(pattern, text))
         return found[name]
 
-    return [item for item in terms if any(matches(name) for name in (item['from'], item['to'], *item.get('aliases', [])))]
+    return [item for item in terms if any(matches(name) for name in (item['to'], *item.get('mistakes', []), *item.get('aliases', [])))]
 
 
 def update_workspace(changes):
@@ -62,30 +124,9 @@ def update_workspace(changes):
         if 'last_minutes' in changes:
             data['last_minutes'] = str(changes['last_minutes'])
         if 'terms' in changes:
-            terms = changes['terms']
-            if not isinstance(terms, list) or len(terms) > 500:
-                raise ValueError('术语库最多保存 500 条')
-            cleaned = {}
-            for item in terms:
-                original = str(item.get('from', '')).strip()
-                replacement = str(item.get('to', '')).strip()
-                if not original or not replacement or max(len(original), len(replacement)) > 100:
-                    raise ValueError('原词与准确名称均需填写，最多 100 字')
-                cleaned[original] = {'from': original, 'to': replacement}
-                aliases = item.get('aliases', [])
-                if not isinstance(aliases, list) or not all(isinstance(a, str) for a in aliases):
-                    raise ValueError('其他别名需按名称填写')
-                aliases = list(dict.fromkeys(a.strip() for a in aliases if a.strip() not in ('', original, replacement)))
-                if len(aliases) > 20 or any(len(a) > 100 for a in aliases):
-                    raise ValueError('最多可填 20 个其他别名，每个最多 100 字')
-                if aliases:
-                    cleaned[original]['aliases'] = aliases
-                meaning = str(item.get('meaning') or '').strip()
-                if len(meaning) > 500:
-                    raise ValueError('含义与使用场景最多 500 字')
-                if meaning:
-                    cleaned[original]['meaning'] = meaning
-            data['terms'] = list(cleaned.values())
+            data['terms'] = _canonical_terms(changes['terms'])
+        if 'glossary_edit' in changes:
+            data['terms'] = _edit_glossary(data['terms'], changes['glossary_edit'])
         path = config_dir() / 'workspace.json'
         temp = path.with_suffix('.tmp')
         temp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')

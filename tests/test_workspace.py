@@ -31,7 +31,7 @@ def meeting(tmp_path, monkeypatch):
 def test_preferences_and_dictionary_persist_and_validate(tmp_path, monkeypatch):
     monkeypatch.setenv('MEETINGKIT_HOME', str(tmp_path))
     update_workspace({'font_size': 17, 'reduce_motion': True, 'terms': [{'from': '错词', 'to': '准确词'}]})
-    assert read_workspace()['terms'] == [{'from': '错词', 'to': '准确词'}]
+    assert read_workspace()['terms'] == [{'to': '准确词', 'mistakes': ['错词'], 'aliases': []}]
     assert read_workspace()['font_size'] == 17
     with pytest.raises(ValueError): update_workspace({'font_size': 100})
     with pytest.raises(ValueError): update_workspace({'terms': [{'from': '', 'to': 'x'}]})
@@ -125,9 +125,9 @@ def test_old_term_can_gain_and_clear_meaning(meeting):
     assert api.save_workspace({'terms': [legacy]})['ok']
     updated = {**legacy, 'meaning': '只在预算复核场景使用', 'aliases': ['预算复核组']}
     assert api.save_workspace({'terms': [updated]})['ok']
-    assert api.get_workspace()['terms'] == [updated]
+    assert api.get_workspace()['terms'] == [{'to': 'AFRC', 'mistakes': ['AFC'], 'aliases': ['预算复核组'], 'meaning': updated['meaning']}]
     assert api.save_workspace({'terms': [{**updated, 'meaning': ''}]})['ok']
-    assert api.get_workspace()['terms'] == [{**legacy, 'aliases': ['预算复核组']}]
+    assert api.get_workspace()['terms'] == [{'to': 'AFRC', 'mistakes': ['AFC'], 'aliases': ['预算复核组']}]
 
 
 @pytest.mark.parametrize('variant', ['AFC', ' a f c ', 'A.F.C.', 'a. F. c.', 'Ａ．Ｆ．Ｃ', 'aFc',
@@ -158,4 +158,51 @@ def test_glossary_candidate_reaches_writer_and_reviewer(tmp_path, monkeypatch, v
                                   'AFC2', 'A。下一位提到 FC', 'A\nF\nC'])
 def test_longer_codes_and_unrelated_speech_do_not_select_term(text):
     from meetingkit.workspace import matching_terms
-    assert not matching_terms([{'from': 'AFC', 'to': 'AFRC'}], text)
+    assert not matching_terms([{'mistakes': ['AFC'], 'to': 'AFRC'}], text)
+
+
+def test_legacy_glossary_merges_on_read_and_roundtrip(tmp_path, monkeypatch):
+    monkeypatch.setenv('MEETINGKIT_HOME', str(tmp_path))
+    path = tmp_path / 'workspace.json'
+    path.write_text(json.dumps({'terms': [
+        {'from': 'AFC', 'to': 'AFRC', 'meaning': '审批组', 'aliases': ['复核组']},
+        {'from': 'AFCR', 'to': 'afrc', 'meaning': '负责预算复核'},
+    ]}), encoding='utf-8')
+    terms = read_workspace()['terms']
+    assert terms == [{'to': 'AFRC', 'mistakes': ['AFC', 'AFCR'], 'aliases': ['复核组'],
+                      'meaning': '审批组\n负责预算复核'}]
+    update_workspace({'font_size': 14})
+    assert json.loads(path.read_text(encoding='utf-8'))['terms'] == terms
+
+
+def test_confirmed_corrections_merge_atomically_and_keep_aliases(meeting):
+    from concurrent.futures import ThreadPoolExecutor
+    from meetingkit.workspace import matching_terms
+    api = server.Api()
+    old = {'to': 'AFRC', 'meaning': '审核机构', 'aliases': ['复核组'], 'mistakes': []}
+    api.save_workspace({'terms': [old]})
+    def remember(original):
+        return api.save_workspace({'glossary_edit': {'entry': {'to': 'AFRC', 'mistakes': [original]}}})
+    with ThreadPoolExecutor(3) as pool:
+        assert all(result['ok'] for result in pool.map(remember, ['AFC', 'AFCR', 'AFC']))
+    entry, = api.get_workspace()['terms']
+    assert entry['meaning'] == old['meaning'] and entry['aliases'] == old['aliases']
+    assert sorted(entry['mistakes']) == ['AFC', 'AFCR']
+    assert matching_terms([entry], '讨论 A.F.C.R. 流程') == [entry]
+    assert not api.save_workspace({'glossary_edit': {'previous': old}})['ok']
+    changed = {**entry, 'mistakes': ['AFC'], 'aliases': []}
+    assert api.save_workspace({'glossary_edit': {'previous': entry, 'entry': changed}})['terms'] == [changed]
+    assert not matching_terms([changed], '讨论 AFCR 流程')
+
+
+def test_capitalized_name_is_preserved_from_editor_and_library(meeting):
+    api = server.Api()
+    for entry in [
+        {'to': 'Atlas', 'mistakes': ['Atals']},
+        {'to': 'atlas', 'mistakes': ['Atlus']},
+        {'to': 'ATLAS', 'aliases': ['地图组']},
+    ]:
+        assert api.save_workspace({'glossary_edit': {'entry': entry}})['ok']
+    expected = [{'to': 'Atlas', 'mistakes': ['Atals', 'Atlus'], 'aliases': ['地图组']}]
+    assert api.get_workspace()['terms'] == expected
+    assert read_workspace()['terms'] == expected
