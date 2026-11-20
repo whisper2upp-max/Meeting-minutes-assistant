@@ -206,3 +206,18 @@ def test_capitalized_name_is_preserved_from_editor_and_library(meeting):
     expected = [{'to': 'Atlas', 'mistakes': ['Atals', 'Atlus'], 'aliases': ['地图组']}]
     assert api.get_workspace()['terms'] == expected
     assert read_workspace()['terms'] == expected
+
+
+def test_speaker_previews_use_substantive_audio_for_each_speaker(meeting):
+    sentences = [
+        (0, 0, 400, "好。"), (0, 500, 9500, "嗯。"), (1, 9600, 9950, "对"),
+        (0, 10000, 17000, "我们先看预算执行情况，下周再核对一次。"),
+        (1, 18000, 19900, "我也同意"), (0, 20000, 75000, "较长的完整发言" * 10),
+        (1, 76000, 76000, "这句没有可播放的时间"), (2, 77000, 77000, "无效"),
+    ]
+    (meeting.parent / 'transcript.json').write_text(json.dumps({'sentences': [
+        dict(speaker_id=s, begin_ms=b, end_ms=e, text=t) for s, b, e, t in sentences
+    ]}), encoding='utf-8')
+    result = server.Api().get_meeting_segments(str(meeting))
+    assert result['speaker_previews'] == {'1': 3, '2': 4}
+    assert [s['text'] for s in result['segments']] == [row[3] for row in sentences]
