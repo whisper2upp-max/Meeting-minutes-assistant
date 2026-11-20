@@ -161,6 +161,25 @@ def _windows_html_fragment(value: str) -> str:
     return value[first_tag:] if first_tag >= 0 else ""
 
 
+def _speaker_preview_indices(segments):
+    """Pick a substantive utterance for each speaker, keeping ties chronological."""
+    indices, scores = {}, {}
+    for index, segment in enumerate(segments):
+        number = segment["number"]
+        duration = segment["end"] - segment["begin"]
+        letters = sum(char.isalnum() for char in segment["text"])
+        if number <= 0 or duration <= 0 or not letters:
+            continue
+        # A long timestamp around a one-word acknowledgement provides little voice.
+        substantive = duration >= 4 and letters >= 8
+        evidence = min(duration, letters / 2)
+        score = (substantive, substantive and duration <= 12, min(evidence, 7), -abs(duration - 7))
+        if number not in scores or score > scores[number]:
+            indices[str(number)] = index
+            scores[number] = score
+    return indices
+
+
 class Api:
     """暴露给 JS 的方法（pywebview 自动驼峰化：get_status -> get_status）。"""
 
@@ -1047,7 +1066,8 @@ class Api:
             audio_url = register(audio) if audio.is_file() and not audio.is_symlink() else ""
             fallback = session / pipeline_mod.TRANSCRIPT_MD
             content = fallback.read_text(encoding="utf-8") if not segments and fallback.is_file() and not fallback.is_symlink() else ""
-            return {"ok": True, "segments": segments, "audio_url": audio_url, "content": content,
+            return {"ok": True, "segments": segments, "speaker_previews": _speaker_preview_indices(segments),
+                    "audio_url": audio_url, "content": content,
                     "audio_message": "" if audio_url else "录音已清理或不存在，仍可查看转写文字"}
         except Exception as exc:
             return {"ok": False, "error": str(exc)}

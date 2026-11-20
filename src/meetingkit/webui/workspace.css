@@ -225,3 +225,19 @@
   .release-entry summary span { order: 1; width: 100%; }
   #guideTopics { padding: 6px; }
 }
+
+.dictionary-copy { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.dictionary-copy small { display: block; color: var(--soft); }
+.dictionary-copy p { margin: 4px 0 0; white-space: pre-wrap; }
+.w-term-row > .w-link { flex: none; margin-left: 0; }
+.dictionary-form { display: grid; gap: 13px; }
+.dictionary-form label { display: grid; gap: 5px; font-size: 13px; }
+.dictionary-form textarea { height: 60px; resize: vertical; }
+.dictionary-tag-field { min-width: 0; margin: 0; padding: 0; border: 0; }
+.dictionary-tag-field legend { margin-bottom: 5px; padding: 0; font-size: 13px; }
+.dictionary-tags, .dictionary-tag-controls { display: flex; align-items: center; gap: 6px; }
+.dictionary-tags { flex-wrap: wrap; margin: 5px 0; }
+.dictionary-tags:empty { display: none; }
+.dictionary-tag-controls input { min-width: 0; flex: 1; }
+.dictionary-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 7px; border-radius: 6px; color: var(--indigo-dark); background: var(--indigo-soft); font-size: 12px; overflow-wrap: anywhere; }
+.chip-remove { padding: 0 3px; border: 0; background: transparent; color: inherit; }

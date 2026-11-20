@@ -31,7 +31,7 @@ def meeting(tmp_path, monkeypatch):
 def test_preferences_and_dictionary_persist_and_validate(tmp_path, monkeypatch):
     monkeypatch.setenv('MEETINGKIT_HOME', str(tmp_path))
     update_workspace({'font_size': 17, 'reduce_motion': True, 'terms': [{'from': '错词', 'to': '准确词'}]})
-    assert read_workspace()['terms'] == [{'from': '错词', 'to': '准确词'}]
+    assert read_workspace()['terms'] == [{'to': '准确词', 'mistakes': ['错词'], 'aliases': []}]
     assert read_workspace()['font_size'] == 17
     with pytest.raises(ValueError): update_workspace({'font_size': 100})
     with pytest.raises(ValueError): update_workspace({'terms': [{'from': '', 'to': 'x'}]})
@@ -113,8 +113,111 @@ def test_dictionary_reference_reaches_generation_without_unrelated_terms(tmp_pat
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='# 会议纪要'))])
     client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
     monkeypatch.setattr(llm, 'OpenAI', lambda **kwargs: client)
-    monkeypatch.setattr(llm, 'proofread_minutes', lambda client, model, text: text)
     llm.generate_minutes('通过飞书妙季整理会议。', api_key='test')
     messages = json.dumps(calls[0]['messages'], ensure_ascii=False)
     assert '飞书妙记' in messages
     assert '无关名称' not in messages
+
+
+def test_old_term_can_gain_and_clear_meaning(meeting):
+    api = server.Api()
+    legacy = {'from': 'AFC', 'to': 'AFRC'}
+    assert api.save_workspace({'terms': [legacy]})['ok']
+    updated = {**legacy, 'meaning': '只在预算复核场景使用', 'aliases': ['预算复核组']}
+    assert api.save_workspace({'terms': [updated]})['ok']
+    assert api.get_workspace()['terms'] == [{'to': 'AFRC', 'mistakes': ['AFC'], 'aliases': ['预算复核组'], 'meaning': updated['meaning']}]
+    assert api.save_workspace({'terms': [{**updated, 'meaning': ''}]})['ok']
+    assert api.get_workspace()['terms'] == [{'to': 'AFRC', 'mistakes': ['AFC'], 'aliases': ['预算复核组']}]
+
+
+@pytest.mark.parametrize('variant', ['AFC', ' a f c ', 'A.F.C.', 'a. F. c.', 'Ａ．Ｆ．Ｃ', 'aFc',
+                                      'aFrC', 'A\u00a0F\u00a0C', '预算复核组'])
+def test_glossary_candidate_reaches_writer_and_reviewer(tmp_path, monkeypatch, variant):
+    from types import SimpleNamespace
+    from meetingkit.cloud import llm
+    monkeypatch.setenv('MEETINGKIT_HOME', str(tmp_path))
+    meaning = '预算审批流程，仅用于复核预算。'
+    update_workspace({'terms': [{'from': 'AFC', 'to': 'AFRC', 'meaning': meaning, 'aliases': ['预算复核组']},
+                                {'from': '其他', 'to': '另外一个词', 'meaning': '无关释义'}]})
+    calls = []
+    def create(**kwargs):
+        calls.append(kwargs['messages'])
+        content = '# 本周预算已提交 AFRC。' if len(calls) == 1 else '{"uncertain":[],"corrections":[]}'
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+    monkeypatch.setattr(llm, 'OpenAI', lambda **kwargs: SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
+    result = llm.generate_minutes(f'本周预算已提交{variant}。', api_key='test')
+    assert result.review['status'] == 'done'
+    assert len(calls) == 2
+    for messages in calls:
+        prompt = json.dumps(messages, ensure_ascii=False)
+        assert meaning in prompt and '无关释义' not in prompt
+
+
+@pytest.mark.parametrize('text', ['CAFCA', 'afcost', 'XXAFRC', 'A.F.C.D', 'X.A.F.C', 'X A F C', 'A F C D',
+                                  'AFC2', 'A。下一位提到 FC', 'A\nF\nC'])
+def test_longer_codes_and_unrelated_speech_do_not_select_term(text):
+    from meetingkit.workspace import matching_terms
+    assert not matching_terms([{'mistakes': ['AFC'], 'to': 'AFRC'}], text)
+
+
+def test_legacy_glossary_merges_on_read_and_roundtrip(tmp_path, monkeypatch):
+    monkeypatch.setenv('MEETINGKIT_HOME', str(tmp_path))
+    path = tmp_path / 'workspace.json'
+    path.write_text(json.dumps({'terms': [
+        {'from': 'AFC', 'to': 'AFRC', 'meaning': '审批组', 'aliases': ['复核组']},
+        {'from': 'AFCR', 'to': 'afrc', 'meaning': '负责预算复核'},
+    ]}), encoding='utf-8')
+    terms = read_workspace()['terms']
+    assert terms == [{'to': 'AFRC', 'mistakes': ['AFC', 'AFCR'], 'aliases': ['复核组'],
+                      'meaning': '审批组\n负责预算复核'}]
+    update_workspace({'font_size': 14})
+    assert json.loads(path.read_text(encoding='utf-8'))['terms'] == terms
+
+
+def test_confirmed_corrections_merge_atomically_and_keep_aliases(meeting):
+    from concurrent.futures import ThreadPoolExecutor
+    from meetingkit.workspace import matching_terms
+    api = server.Api()
+    old = {'to': 'AFRC', 'meaning': '审核机构', 'aliases': ['复核组'], 'mistakes': []}
+    api.save_workspace({'terms': [old]})
+    def remember(original):
+        return api.save_workspace({'glossary_edit': {'entry': {'to': 'AFRC', 'mistakes': [original]}}})
+    with ThreadPoolExecutor(3) as pool:
+        assert all(result['ok'] for result in pool.map(remember, ['AFC', 'AFCR', 'AFC']))
+    entry, = api.get_workspace()['terms']
+    assert entry['meaning'] == old['meaning'] and entry['aliases'] == old['aliases']
+    assert sorted(entry['mistakes']) == ['AFC', 'AFCR']
+    assert matching_terms([entry], '讨论 A.F.C.R. 流程') == [entry]
+    assert not api.save_workspace({'glossary_edit': {'previous': old}})['ok']
+    changed = {**entry, 'mistakes': ['AFC'], 'aliases': []}
+    assert api.save_workspace({'glossary_edit': {'previous': entry, 'entry': changed}})['terms'] == [changed]
+    assert not matching_terms([changed], '讨论 AFCR 流程')
+
+
+def test_capitalized_name_is_preserved_from_editor_and_library(meeting):
+    api = server.Api()
+    for entry in [
+        {'to': 'Atlas', 'mistakes': ['Atals']},
+        {'to': 'atlas', 'mistakes': ['Atlus']},
+        {'to': 'ATLAS', 'aliases': ['地图组']},
+    ]:
+        assert api.save_workspace({'glossary_edit': {'entry': entry}})['ok']
+    expected = [{'to': 'Atlas', 'mistakes': ['Atals', 'Atlus'], 'aliases': ['地图组']}]
+    assert api.get_workspace()['terms'] == expected
+    assert read_workspace()['terms'] == expected
+
+
+def test_speaker_previews_use_substantive_audio_for_each_speaker(meeting):
+    sentences = [
+        (0, 0, 400, "好。"), (0, 500, 9500, "嗯。"), (1, 9600, 9950, "对"),
+        (0, 10000, 17000, "我们先看预算执行情况，下周再核对一次。"),
+        (1, 18000, 19900, "我也同意"), (0, 20000, 75000, "较长的完整发言" * 10),
+        (1, 76000, 76000, "这句没有可播放的时间"), (2, 77000, 77000, "无效"),
+    ]
+    (meeting.parent / 'transcript.json').write_text(json.dumps({'sentences': [
+        dict(speaker_id=s, begin_ms=b, end_ms=e, text=t) for s, b, e, t in sentences
+    ]}), encoding='utf-8')
+    result = server.Api().get_meeting_segments(str(meeting))
+    assert result['speaker_previews'] == {'1': 3, '2': 4}
+    assert [s['text'] for s in result['segments']] == [row[3] for row in sentences]
